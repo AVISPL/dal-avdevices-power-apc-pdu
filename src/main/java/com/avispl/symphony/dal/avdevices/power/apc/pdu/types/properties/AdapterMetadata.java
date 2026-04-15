@@ -6,7 +6,7 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 
-import com.avispl.symphony.dal.infrastructure.management.apcpdu.common.Constant;
+import com.avispl.symphony.dal.avdevices.power.apc.pdu.common.Constant;
 
 /**
  * Represents adapter metadata properties.
