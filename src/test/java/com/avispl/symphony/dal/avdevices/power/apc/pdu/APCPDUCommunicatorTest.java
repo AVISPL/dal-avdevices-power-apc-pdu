@@ -23,7 +23,6 @@ class APCPDUCommunicatorTest {
 		communicator.setLogin("");
 		communicator.setPassword("");
 		communicator.init();
-		communicator.connect();
 	}
 
 	@AfterEach
