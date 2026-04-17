@@ -3,6 +3,7 @@ package com.avispl.symphony.dal.avdevices.power.apc.pdu;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import javax.security.auth.login.FailedLoginException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,6 +30,16 @@ class APCPDUCommunicatorTest {
 	void destroy() throws Exception {
 		communicator.disconnect();
 		communicator.destroy();
+	}
+
+	@Test
+	void testLogin_withInvalidCredential() throws Exception {
+		this.communicator.destroy();
+		this.communicator.setLogin("");
+		this.communicator.setPassword("");
+		this.communicator.init();
+
+		Assertions.assertThrows(FailedLoginException.class, () -> this.communicator.getMultipleStatistics());
 	}
 
 	@Test

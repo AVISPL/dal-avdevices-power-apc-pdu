@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.concurrent.locks.ReentrantLock;
 
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.common.Logger;
-import com.avispl.symphony.dal.communicator.TelnetCommunicator;
+import com.avispl.symphony.dal.communicator.SshCommunicator;
 
 /**
  * Configures the communicator and provides helper methods for managing adapter properties.
@@ -14,7 +14,7 @@ import com.avispl.symphony.dal.communicator.TelnetCommunicator;
  * @author Kevin / Symphony Dev Team
  * @since 1.0.0
  */
-public abstract class BaseCommunicator extends TelnetCommunicator {
+public abstract class BaseCommunicator extends SshCommunicator {
 	/** Lock for thread-safe operations. */
 	protected final ReentrantLock reentrantLock;
 	/** Logger used for recording diagnostic and runtime information. */
@@ -27,11 +27,10 @@ public abstract class BaseCommunicator extends TelnetCommunicator {
 
 	@Override
 	protected void internalInit() throws Exception {
-		super.setLoginPrompt("User Name: ");
-		super.setPasswordPrompt("Password: ");
-		super.setCommandSuccessList(List.of("APC>"));
+		super.setCommandSuccessList(List.of("APC>", "Bye."));
 		super.setCommandErrorList(List.of("Error"));
 		super.setLoginSuccessList(List.of("APC>"));
+		super.setLoginErrorList(List.of("Login failed."));
 		super.internalInit();
 	}
 
