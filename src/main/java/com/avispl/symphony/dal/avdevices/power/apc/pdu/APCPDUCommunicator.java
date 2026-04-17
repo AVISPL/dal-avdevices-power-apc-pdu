@@ -57,14 +57,18 @@ public class APCPDUCommunicator extends BaseCommunicator implements Monitorable,
 
 	@Override
 	public List<Statistics> getMultipleStatistics() throws Exception {
-		var statistics = new HashMap<String, String>();
-		var controllableProperties = new ArrayList<AdvancedControllableProperty>();
+		this.reentrantLock.lock();
+		try {
+			var statistics = new HashMap<String, String>();
+			var controllableProperties = new ArrayList<AdvancedControllableProperty>();
 
-		statistics.putAll(MonitoringHelper.generateAdapterMetadata(this.versionProperties));
+			statistics.putAll(MonitoringHelper.generateAdapterMetadata(this.versionProperties));
 
-		this.localExtendedStatistics.setStatistics(statistics);
-		this.localExtendedStatistics.setControllableProperties(controllableProperties);
-
+			this.localExtendedStatistics.setStatistics(statistics);
+			this.localExtendedStatistics.setControllableProperties(controllableProperties);
+		} finally {
+			this.reentrantLock.unlock();
+		}
 		return Collections.singletonList(this.localExtendedStatistics);
 	}
 
