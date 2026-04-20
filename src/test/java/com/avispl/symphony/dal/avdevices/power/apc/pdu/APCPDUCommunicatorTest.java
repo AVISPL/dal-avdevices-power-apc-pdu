@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import com.avispl.symphony.api.dal.dto.monitor.ExtendedStatistics;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.common.Constant;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.types.properties.AdapterMetadata;
+import com.avispl.symphony.dal.avdevices.power.apc.pdu.types.properties.General;
 
 class APCPDUCommunicatorTest {
 	private APCPDUCommunicator communicator;
@@ -43,6 +44,19 @@ class APCPDUCommunicatorTest {
 	}
 
 	@Test
+	void testGetMultipleStatistics_withGeneral() throws Exception {
+		var extendedStatistics = (ExtendedStatistics) this.communicator.getMultipleStatistics().get(0);
+		var verifiedStatistics = this.filterGroupStatistics(extendedStatistics.getStatistics(), null);
+		var expectedSize = General.values().length;
+
+		Assertions.assertEquals(expectedSize, verifiedStatistics.size(), "General properties doesn't match size");
+		verifiedStatistics.forEach((key, value) -> {
+			Assertions.assertFalse(key.contains("#"), "Invalid field: " + key);
+			Assertions.assertTrue(this.isValidValue(value), "Key '%s'. Invalid value: %s".formatted(key, value));
+		});
+	}
+
+	@Test
 	void testGetMultipleStatistics_withAdapterMetadataGroup() throws Exception {
 		var extendedStatistics = (ExtendedStatistics) this.communicator.getMultipleStatistics().get(0);
 		var verifiedStatistics = this.filterGroupStatistics(extendedStatistics.getStatistics(), Constant.ADAPTER_METADATA_GROUP);
@@ -62,6 +76,6 @@ class APCPDUCommunicatorTest {
 	}
 
 	private boolean isValidValue(String value) {
-		return value != null && !Constant.NOT_AVAILABLE.equals(value);
+		return value != null && !value.isEmpty() && !value.isBlank();
 	}
 }

@@ -17,6 +17,8 @@ import com.avispl.symphony.api.dal.dto.monitor.Statistics;
 import com.avispl.symphony.api.dal.monitor.Monitorable;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.bases.BaseCommunicator;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.helpers.MonitoringHelper;
+import com.avispl.symphony.dal.avdevices.power.apc.pdu.models.GeneralInformation;
+import com.avispl.symphony.dal.avdevices.power.apc.pdu.types.Command;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.types.properties.AdapterMetadata;
 
 /**
@@ -33,12 +35,16 @@ public class APCPDUCommunicator extends BaseCommunicator implements Monitorable,
 	/** Device adapter instantiation timestamp. */
 	private final long adapterInitializationTimestamp;
 
+	/** Stores general information from {@link Command#VER} command */
+	private GeneralInformation generalInformation;
+
 	public APCPDUCommunicator() {
 		this.localExtendedStatistics = new ExtendedStatistics();
 		this.localExtendedStatistics.setStatistics(new HashMap<>());
 		this.localExtendedStatistics.setControllableProperties(new ArrayList<>());
 		this.versionProperties = new Properties();
 		this.adapterInitializationTimestamp = System.currentTimeMillis();
+		this.generalInformation = new GeneralInformation();
 	}
 
 	@Override
@@ -49,6 +55,7 @@ public class APCPDUCommunicator extends BaseCommunicator implements Monitorable,
 
 	@Override
 	protected void internalDestroy() {
+		this.generalInformation = null;
 		this.localExtendedStatistics.getStatistics().clear();
 		this.localExtendedStatistics.getControllableProperties().clear();
 		this.versionProperties.clear();
@@ -59,7 +66,8 @@ public class APCPDUCommunicator extends BaseCommunicator implements Monitorable,
 	public List<Statistics> getMultipleStatistics() throws Exception {
 		this.reentrantLock.lock();
 		try {
-			var statistics = new HashMap<String, String>();
+			this.populateData();
+			var statistics = new HashMap<>(MonitoringHelper.generateGeneral(this.generalInformation));
 			var controllableProperties = new ArrayList<AdvancedControllableProperty>();
 
 			statistics.putAll(MonitoringHelper.generateAdapterMetadata(this.versionProperties));
@@ -93,5 +101,15 @@ public class APCPDUCommunicator extends BaseCommunicator implements Monitorable,
 			this.log.error("Failed to load the version.properties file", e);
 		}
 		this.versionProperties.setProperty(AdapterMetadata.ADAPTER_UPTIME.getProperty(), String.valueOf(this.adapterInitializationTimestamp));
+	}
+
+	/**
+	 * Executes predefined commands to retrieve data from the device
+	 * and populates corresponding model objects.
+	 *
+	 * @throws Exception if command execution or parsing fails
+	 */
+	private void populateData() throws Exception {
+		this.generalInformation = this.send(Command.VER.getRequest(), GeneralInformation.class);
 	}
 }
