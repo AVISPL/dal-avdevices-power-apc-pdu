@@ -9,7 +9,9 @@ import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.common.Util;
+import com.avispl.symphony.dal.avdevices.power.apc.pdu.models.GeneralInformation;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.types.properties.AdapterMetadata;
+import com.avispl.symphony.dal.avdevices.power.apc.pdu.types.properties.General;
 
 /**
  * Helper class for generating monitoring properties.
@@ -19,6 +21,29 @@ import com.avispl.symphony.dal.avdevices.power.apc.pdu.types.properties.AdapterM
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class MonitoringHelper {
+	/**
+	 * Generates general properties from the provided {@link GeneralInformation}.
+	 *
+	 * @param generalInformation the general information object
+	 * @return a map of general properties (never {@code null})
+	 */
+	public static Map<String, String> generateGeneral(GeneralInformation generalInformation) {
+		var properties = new HashMap<String, String>();
+		for (General general : General.values()) {
+			String propertyValue = Util.mapToValue(switch (general) {
+				case AOS_VERSION -> generalInformation.getAosVersion();
+				case INPUT_TYPE -> generalInformation.getInputType();
+				case MAX_LOAD_CURRENT -> generalInformation.getMaxLoad();
+				case MODEL -> generalInformation.getModel();
+				case OUTLET_TOTAL -> generalInformation.getOutlets();
+				case PDU_VERSION -> generalInformation.getPduVersion();
+			});
+			properties.put(general.getDisplayName(), propertyValue);
+		}
+
+		return properties;
+	}
+
 	/**
 	 * Generates adapter metadata properties from the provided {@link Properties}.
 	 *
