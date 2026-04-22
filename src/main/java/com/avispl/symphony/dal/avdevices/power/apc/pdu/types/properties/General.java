@@ -18,7 +18,7 @@ import lombok.experimental.FieldDefaults;
 public enum General {
 	AOS_VERSION("AOSVersion"),
 	INPUT_TYPE("InputType"),
-	MAX_LOAD_CURRENT("MaxLoadCurrent(A)"),
+	MAX_LOAD_CURRENT("MaximumLoadCurrent(A)"),
 	MODEL("Model"),
 	OUTLET_TOTAL("OutletTotal"),
 	PDU_VERSION("PDUVersion");

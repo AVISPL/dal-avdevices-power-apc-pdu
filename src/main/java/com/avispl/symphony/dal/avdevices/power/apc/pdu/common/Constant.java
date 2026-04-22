@@ -19,7 +19,7 @@ public final class Constant {
 	public static final String EMPTY = "";
 
 	//	Format
-	public static final Pattern ERROR_RESPONSE_PATTERN = Pattern.compile("(?m)^\\s*E00\\s*$");
+	public static final Pattern ERROR_RESPONSE_PATTERN = Pattern.compile("(?m)^\\s*E10\\s*$");
 
 	//	Group
 	public static final String ADAPTER_METADATA_GROUP = "AdapterMetadata";
