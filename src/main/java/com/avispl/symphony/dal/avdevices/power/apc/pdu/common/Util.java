@@ -38,7 +38,7 @@ public final class Util {
 	 * @param isTitleCase whether to convert string to title case
 	 * @return normalized string representation or {@link Constant#NOT_AVAILABLE}
 	 */
-	private static String mapToValue(Object value, boolean isTitleCase) {
+	public static String mapToValue(Object value, boolean isTitleCase) {
 		if (value == null) {
 			LOG.warn("Skip value mapping: value is null");
 			return Constant.NOT_AVAILABLE;
@@ -173,5 +173,53 @@ public final class Util {
 			LOG.error("Failed to mapToUptimeMin with uptime: " + uptime, e);
 			return null;
 		}
+	}
+
+	/**
+	 * Extracts a version string from the given input.
+	 *
+	 * <p>The method scans the input from left to right and returns the first
+	 * continuous sequence that starts with a digit and may contain digits and dots ('.').
+	 * Parsing stops when a non-digit and non-dot character is encountered after the version starts.	 *
+	 * <p>This implementation avoids regular expressions to ensure predictable performance
+	 * and to eliminate the risk of excessive backtracking on large inputs.
+	 *
+	 * @param input the input string that may contain a version
+	 * @return the extracted version string, or {@code null} if no version is found
+	 */
+	public static String extractVersion(String input) {
+		if (input == null) {
+			return null;
+		}
+
+		StringBuilder sb = new StringBuilder();
+		boolean started = false;
+		for (char c : input.toCharArray()) {
+			if (Character.isDigit(c)) {
+				sb.append(c);
+				started = true;
+			} else if (c == '.' && started) {
+				sb.append(c);
+			} else if (started) {
+				break;
+			}
+		}
+
+		return !sb.isEmpty() ? sb.toString() : null;
+	}
+
+	/**
+	 * Extracts the numeric portion from the given input string by removing all
+	 * non-numeric characters except digits, decimal point ('.'), and minus sign ('-').
+	 *
+	 * <p>This method is useful for quickly normalizing values that include units,
+	 * such as "12A", "5.5kW", or "-3.3V".
+	 *
+	 * @param input the input string containing a numeric value with optional unit
+	 * @return a string containing only numeric characters, decimal point, and minus sign;
+	 * or an empty string if no numeric characters are found
+	 */
+	public static String extractUnit(String input) {
+		return input.replaceAll("[^\\d.-]", Constant.EMPTY);
 	}
 }

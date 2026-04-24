@@ -30,15 +30,15 @@ public final class MonitoringHelper {
 	public static Map<String, String> generateGeneral(GeneralInformation generalInformation) {
 		var properties = new HashMap<String, String>();
 		for (General general : General.values()) {
-			String propertyValue = Util.mapToValue(switch (general) {
-				case AOS_VERSION -> generalInformation.getAosVersion();
+			String propertyValue = switch (general) {
+				case AOS_VERSION -> Util.extractVersion(generalInformation.getAosVersion());
 				case INPUT_TYPE -> generalInformation.getInputType();
-				case MAX_LOAD_CURRENT -> generalInformation.getMaxLoad();
+				case MAX_LOAD_CURRENT -> Util.extractUnit(generalInformation.getMaxLoad());
 				case MODEL -> generalInformation.getModel();
 				case OUTLET_TOTAL -> generalInformation.getOutlets();
-				case PDU_VERSION -> generalInformation.getPduVersion();
-			});
-			properties.put(general.getDisplayName(), propertyValue);
+				case PDU_VERSION -> Util.extractVersion(generalInformation.getPduVersion());
+			};
+			properties.put(general.getDisplayName(), Util.mapToValue(propertyValue, !General.INPUT_TYPE.equals(general)));
 		}
 
 		return properties;
