@@ -31,7 +31,7 @@ public final class MonitoringHelper {
 		var properties = new HashMap<String, String>();
 		for (General general : General.values()) {
 			String propertyValue = switch (general) {
-				case AOS_VERSION -> Util.extractVersion(generalInformation.getAosVersion());
+				case AOS_VERSION -> generalInformation.getAosVersion();
 				case INPUT_TYPE -> generalInformation.getInputType();
 				case MAX_LOAD_CURRENT -> Util.extractUnit(generalInformation.getMaxLoad());
 				case MODEL -> generalInformation.getModel();
