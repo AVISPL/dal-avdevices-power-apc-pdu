@@ -2,6 +2,7 @@
 package com.avispl.symphony.dal.avdevices.power.apc.pdu.helpers;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
@@ -29,6 +30,7 @@ public final class MonitoringHelper {
 	 */
 	public static Map<String, String> generateGeneral(GeneralInformation generalInformation) {
 		var properties = new HashMap<String, String>();
+		var lowerCaseProperties = List.of(General.AOS_VERSION, General.INPUT_TYPE, General.PDU_VERSION);
 		for (General general : General.values()) {
 			String propertyValue = switch (general) {
 				case AOS_VERSION -> generalInformation.getAosVersion();
@@ -38,7 +40,7 @@ public final class MonitoringHelper {
 				case OUTLET_TOTAL -> generalInformation.getOutlets();
 				case PDU_VERSION -> generalInformation.getPduVersion();
 			};
-			properties.put(general.getDisplayName(), Util.mapToValue(propertyValue, !General.INPUT_TYPE.equals(general)));
+			properties.put(general.getDisplayName(), Util.mapToValue(propertyValue, !lowerCaseProperties.contains(general)));
 		}
 
 		return properties;
