@@ -36,7 +36,7 @@ public final class MonitoringHelper {
 				case MAX_LOAD_CURRENT -> Util.extractUnit(generalInformation.getMaxLoad());
 				case MODEL -> generalInformation.getModel();
 				case OUTLET_TOTAL -> generalInformation.getOutlets();
-				case PDU_VERSION -> Util.extractVersion(generalInformation.getPduVersion());
+				case PDU_VERSION -> generalInformation.getPduVersion();
 			};
 			properties.put(general.getDisplayName(), Util.mapToValue(propertyValue, !General.INPUT_TYPE.equals(general)));
 		}
