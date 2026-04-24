@@ -176,39 +176,6 @@ public final class Util {
 	}
 
 	/**
-	 * Extracts a version string from the given input.
-	 *
-	 * <p>The method scans the input from left to right and returns the first
-	 * continuous sequence that starts with a digit and may contain digits and dots ('.').
-	 * Parsing stops when a non-digit and non-dot character is encountered after the version starts.	 *
-	 * <p>This implementation avoids regular expressions to ensure predictable performance
-	 * and to eliminate the risk of excessive backtracking on large inputs.
-	 *
-	 * @param input the input string that may contain a version
-	 * @return the extracted version string, or {@code null} if no version is found
-	 */
-	public static String extractVersion(String input) {
-		if (input == null) {
-			return null;
-		}
-
-		StringBuilder sb = new StringBuilder();
-		boolean started = false;
-		for (char c : input.toCharArray()) {
-			if (Character.isDigit(c)) {
-				sb.append(c);
-				started = true;
-			} else if (c == '.' && started) {
-				sb.append(c);
-			} else if (started) {
-				break;
-			}
-		}
-
-		return !sb.isEmpty() ? sb.toString() : null;
-	}
-
-	/**
 	 * Extracts the numeric portion from the given input string by removing all
 	 * non-numeric characters except digits, decimal point ('.'), and minus sign ('-').
 	 *
