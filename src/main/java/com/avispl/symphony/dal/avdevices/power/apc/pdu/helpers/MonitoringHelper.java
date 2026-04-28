@@ -9,9 +9,12 @@ import java.util.Properties;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
+import com.avispl.symphony.api.common.error.InvalidArgumentException;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.common.Util;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.models.GeneralInformation;
+import com.avispl.symphony.dal.avdevices.power.apc.pdu.models.Pdu;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.types.properties.AdapterMetadata;
+import com.avispl.symphony.dal.avdevices.power.apc.pdu.types.properties.Configuration;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.types.properties.General;
 
 /**
@@ -25,22 +28,41 @@ public final class MonitoringHelper {
 	/**
 	 * Generates general properties from the provided {@link GeneralInformation}.
 	 *
-	 * @param generalInformation the general information object
-	 * @return a map of general properties (never {@code null})
+	 * @param is3Phases indicates whether the PDU is 3-phase
+	 * @param generalInformation the source of general device information (must not be {@code null})
+	 * @param pdu the source of PDU data (must not be {@code null})
+	 * @return a map of property display names to their corresponding values; never {@code null}
+	 * @throws InvalidArgumentException if an unexpected {@link General} value is encountered
 	 */
-	public static Map<String, String> generateGeneral(GeneralInformation generalInformation) {
+	public static Map<String, String> generateGeneral(boolean is3Phases, GeneralInformation generalInformation, Pdu pdu) {
 		var properties = new HashMap<String, String>();
-		var lowerCaseProperties = List.of(General.AOS_VERSION, General.INPUT_TYPE, General.PDU_VERSION);
-		for (General general : General.values()) {
+		var lowerCaseValues = List.of(General.AOS_VERSION, General.INPUT_TYPE, General.PDU_VERSION);
+		for (General general : General.COMMON_PROPERTIES) {
 			String propertyValue = switch (general) {
 				case AOS_VERSION -> generalInformation.getAosVersion();
 				case INPUT_TYPE -> generalInformation.getInputType();
-				case MAX_LOAD_CURRENT -> Util.extractUnit(generalInformation.getMaxLoad());
+				case MAX_LOAD_CURRENT -> Util.extractValue(generalInformation.getMaxLoad());
 				case MODEL -> generalInformation.getModel();
 				case OUTLET_TOTAL -> generalInformation.getOutlets();
 				case PDU_VERSION -> generalInformation.getPduVersion();
+				case ACTIVE_POWER -> Util.extractValue(pdu.getPowerW());
+				case APPARENT_POWER -> Util.extractValue(pdu.getPowerVA());
+				default -> throw new InvalidArgumentException("Unexpected General in COMMON_PROPERTIES: " + general);
 			};
-			properties.put(general.getDisplayName(), Util.mapToValue(propertyValue, !lowerCaseProperties.contains(general)));
+			properties.put(general.getDisplayName(), Util.mapToValue(propertyValue, !lowerCaseValues.contains(general)));
+		}
+		if (is3Phases) {
+			for (General general : General.THREE_PHASE_PROPERTIES) {
+				String propertyValue = switch (general) {
+					case PHASE_1_CURRENT -> Util.extractValue(pdu.getCurrents().get(1));
+					case PHASE_2_CURRENT -> Util.extractValue(pdu.getCurrents().get(2));
+					case PHASE_3_CURRENT -> Util.extractValue(pdu.getCurrents().get(3));
+					default -> throw new InvalidArgumentException("Unexpected General in THREE_PHASE_PROPERTIES: " + general);
+				};
+				properties.put(general.getDisplayName(), Util.mapToValue(propertyValue));
+			}
+		} else {
+			properties.put(General.CURRENT.getDisplayName(), Util.mapToValue(pdu.getCurrent()));
 		}
 
 		return properties;
@@ -64,6 +86,52 @@ public final class MonitoringHelper {
 			properties.put(adapterMetadata.getDisplayName(), propertyValue);
 		}
 
+		return properties;
+	}
+
+	/**
+	 * Generates a map of configuration properties for the given {@link Pdu}.
+	 *
+	 * @param is3Phases indicates whether the PDU operates in three-phase mode
+	 * @param pdu the source of configuration data (must not be {@code null})
+	 * @return a map of configuration display names to their corresponding values; never {@code null}
+	 * @throws InvalidArgumentException if an unexpected {@link Configuration} value is encountered
+	 */
+	public static Map<String, String> generateConfiguration(boolean is3Phases, Pdu pdu) {
+		var properties = new HashMap<String, String>();
+		properties.put(Configuration.COLD_START_DELAY_SEC.getDisplayName(), Util.mapToValue(pdu.getColdStartDelay()));
+		properties.put(Configuration.COLD_START_DELAY.getDisplayName(), pdu.isNeverColdStartDelay() ? "Off" : "On");
+		if (is3Phases) {
+			for (Configuration configuration : Configuration.THREE_PHASE_PROPERTIES) {
+				String propertyValue = switch (configuration) {
+					case PHASE_1_LOW_LOAD_WARNING -> pdu.getLowLoadWarnings().get(1);
+					case PHASE_2_LOW_LOAD_WARNING -> pdu.getLowLoadWarnings().get(2);
+					case PHASE_3_LOW_LOAD_WARNING -> pdu.getLowLoadWarnings().get(3);
+					case PHASE_1_NEAR_OVERLOAD_WARNING -> pdu.getNearOverloadWarnings().get(1);
+					case PHASE_2_NEAR_OVERLOAD_WARNING -> pdu.getNearOverloadWarnings().get(2);
+					case PHASE_3_NEAR_OVERLOAD_WARNING -> pdu.getNearOverloadWarnings().get(3);
+					case PHASE_1_OVERLOAD_ALARM -> pdu.getOverloadAlarms().get(1);
+					case PHASE_2_OVERLOAD_ALARM -> pdu.getOverloadAlarms().get(2);
+					case PHASE_3_OVERLOAD_ALARM -> pdu.getOverloadAlarms().get(3);
+					case PHASE_1_OVERLOAD_RESTRICTION -> pdu.getOverloadRestrictions().get(1);
+					case PHASE_2_OVERLOAD_RESTRICTION -> pdu.getOverloadRestrictions().get(2);
+					case PHASE_3_OVERLOAD_RESTRICTION -> pdu.getOverloadRestrictions().get(3);
+					default -> throw new InvalidArgumentException("Unexpected Configuration in THREE_PHASE_PROPERTIES: " + configuration);
+				};
+				properties.put(configuration.getDisplayName(), Util.mapToValue(propertyValue));
+			}
+		} else {
+			for (Configuration configuration : Configuration.ONE_PHASE_PROPERTIES) {
+				String propertyValue = switch (configuration) {
+					case LOW_LOAD_WARNING -> pdu.getLowLoadWarning();
+					case NEAR_OVERLOAD_WARNING -> pdu.getNearOverloadWarning();
+					case OVERLOAD_ALARM -> pdu.getOverloadAlarm();
+					case OVERLOAD_RESTRICTION -> pdu.getOverloadRestriction();
+					default -> throw new InvalidArgumentException("Unexpected Configuration in ONE_PHASE_PROPERTIES: " + configuration);
+				};
+				properties.put(configuration.getDisplayName(), Util.mapToValue(propertyValue));
+			}
+		}
 		return properties;
 	}
 }
