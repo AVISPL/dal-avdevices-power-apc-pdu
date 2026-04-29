@@ -3,6 +3,7 @@ package com.avispl.symphony.dal.avdevices.power.apc.pdu.helpers;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map.Entry;
 
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -11,9 +12,13 @@ import com.avispl.symphony.api.common.error.InvalidArgumentException;
 import com.avispl.symphony.api.dal.dto.control.AdvancedControllableProperty;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.common.Constant;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.common.Logger;
+import com.avispl.symphony.dal.avdevices.power.apc.pdu.common.Util;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.models.Pdu;
+import com.avispl.symphony.dal.avdevices.power.apc.pdu.models.outlets.Outlet.OutletDetail;
+import com.avispl.symphony.dal.avdevices.power.apc.pdu.models.outlets.OutletList;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.types.Command;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.types.properties.Configuration;
+import com.avispl.symphony.dal.avdevices.power.apc.pdu.types.properties.Outlets;
 import com.avispl.symphony.dal.util.ControllablePropertyFactory;
 import com.avispl.symphony.dal.util.StringUtils;
 
@@ -106,6 +111,37 @@ public final class ControllerHelper {
 		}
 
 		throw new InvalidArgumentException("Unknown configuration property: '%s'".formatted(property));
+	}
+
+	/**
+	 * Generates a list of controllable outlets properties for the given {@link OutletList}.
+	 *
+	 * @param outletList the source of outlet data (must not be {@code null})
+	 * @return a list of {@link AdvancedControllableProperty} representing outlets controls; never {@code null}
+	 */
+	public static List<AdvancedControllableProperty> generateOutletsControllers(OutletList outletList) {
+		var controllableProperties = new ArrayList<AdvancedControllableProperty>();
+		outletList.getOutlets().forEach(outlet -> {
+			var prefixName = new StringBuilder();
+			prefixName.append(Util.toTitleCase(outlet.getSource())).append("_");
+			prefixName.append(Util.toTitleCase(outlet.getUsername())).append("_");
+			prefixName.append("Outlet_");
+			for (Entry<String, OutletDetail> entry : outlet.getOutletDetails().entrySet()) {
+				var propertyName = prefixName + "%02d".formatted(Integer.parseInt(entry.getKey()));
+				var outletDetail = entry.getValue();
+				controllableProperties.addAll(List.of(
+						ControllablePropertyFactory.createSwitch(Outlets.POWER_OFF_DELAY.getDisplayName(propertyName), outletDetail.isNeverPowerOffDelay() ? 0 : 1),
+						ControllablePropertyFactory.createNumeric(Outlets.POWER_OFF_DELAY_SEC.getDisplayName(propertyName), outletDetail.getPowerOffDelay()),
+						ControllablePropertyFactory.createSwitch(Outlets.POWER_ON_DELAY.getDisplayName(propertyName), outletDetail.isNeverPowerOnDelay() ? 0 : 1),
+						ControllablePropertyFactory.createNumeric(Outlets.POWER_ON_DELAY_SEC.getDisplayName(propertyName), outletDetail.getPowerOnDelay()),
+						ControllablePropertyFactory.createSwitch(Outlets.POWER_STATUS.getDisplayName(propertyName), mapToSwitchValue(outletDetail.getPowerStatus())),
+						ControllablePropertyFactory.createButton(Outlets.REBOOT.getDisplayName(propertyName), "Reboot", "Rebooting", 0L),
+						ControllablePropertyFactory.createNumeric(Outlets.REBOOT_DURATION_SEC.getDisplayName(propertyName), outletDetail.getRebootDuration())
+				));
+			}
+		});
+
+		return controllableProperties;
 	}
 
 	/**

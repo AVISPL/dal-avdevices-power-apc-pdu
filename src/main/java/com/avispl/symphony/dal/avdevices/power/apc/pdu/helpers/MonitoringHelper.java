@@ -4,18 +4,24 @@ package com.avispl.symphony.dal.avdevices.power.apc.pdu.helpers;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Properties;
 
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
 import com.avispl.symphony.api.common.error.InvalidArgumentException;
+import com.avispl.symphony.dal.avdevices.power.apc.pdu.common.Constant;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.common.Util;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.models.GeneralInformation;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.models.Pdu;
+import com.avispl.symphony.dal.avdevices.power.apc.pdu.models.outlets.Outlet.OutletDetail;
+import com.avispl.symphony.dal.avdevices.power.apc.pdu.models.outlets.OutletList;
+import com.avispl.symphony.dal.avdevices.power.apc.pdu.types.InputType;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.types.properties.AdapterMetadata;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.types.properties.Configuration;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.types.properties.General;
+import com.avispl.symphony.dal.avdevices.power.apc.pdu.types.properties.Outlets;
 
 /**
  * Helper class for generating monitoring properties.
@@ -133,5 +139,61 @@ public final class MonitoringHelper {
 			}
 		}
 		return properties;
+	}
+
+	/**
+	 * Generates a map of outlets properties for the given {@link OutletList}.
+	 *
+	 * @param outletList the source of outlets data (must not be {@code null})
+	 * @return a map of outlets display names to their corresponding values; never {@code null}
+	 * @throws InvalidArgumentException if an unexpected {@link OutletList} value is encountered
+	 */
+	public static Map<String, String> generateOutlets(OutletList outletList) {
+		var properties = new HashMap<String, String>();
+		outletList.getOutlets().forEach(outlet -> {
+			var prefixName = new StringBuilder();
+			prefixName.append(Util.toTitleCase(outlet.getSource())).append("_");
+			prefixName.append(Util.toTitleCase(outlet.getUsername())).append("_");
+			prefixName.append("Outlet_");
+			for (Entry<String, OutletDetail> entry : outlet.getOutletDetails().entrySet()) {
+				var outletDetail = entry.getValue();
+				for (Outlets property : Outlets.values()) {
+					var propertyName = prefixName + "%02d".formatted(Integer.parseInt(entry.getKey()));
+					var propertyValue = switch (property) {
+						case NAME -> outletDetail.getName();
+						case POWER_OFF_DELAY -> outletDetail.isNeverPowerOffDelay() ? "Off" : "On";
+						case POWER_OFF_DELAY_SEC -> outletDetail.getPowerOffDelay();
+						case POWER_ON_DELAY -> outletDetail.isNeverPowerOnDelay() ? "Off" : "On";
+						case POWER_ON_DELAY_SEC -> outletDetail.getPowerOnDelay();
+						case POWER_STATUS -> outletDetail.getPowerStatus().toLowerCase();
+						case REBOOT -> Constant.NOT_AVAILABLE;
+						case REBOOT_DURATION_SEC -> outletDetail.getRebootDuration();
+					};
+					properties.put(property.getDisplayName(propertyName), Util.mapToValue(propertyValue));
+				}
+			}
+		});
+		return properties;
+	}
+
+	/**
+	 * Generates dynamic current-related properties based on the PDU input type.
+	 * Returns phase currents for {@link InputType#THREE_PHASE} PDUs, or total current for non–3-phase PDUs.
+	 *
+	 * @param is3Phases indicates whether the PDU is 3-phase
+	 * @param pdu the PDU source data
+	 * @return map of current property names to their values
+	 */
+	public static Map<String, String> generateGeneralDynamicProperties(boolean is3Phases, Pdu pdu) {
+		var dynamicStatistics = new HashMap<String, String>();
+		if (is3Phases) {
+			dynamicStatistics.put(General.PHASE_1_CURRENT.getDisplayName(), pdu.getCurrents().get(0));
+			dynamicStatistics.put(General.PHASE_2_CURRENT.getDisplayName(), pdu.getCurrents().get(1));
+			dynamicStatistics.put(General.PHASE_3_CURRENT.getDisplayName(), pdu.getCurrents().get(2));
+		} else {
+			dynamicStatistics.put(General.CURRENT.getDisplayName(), pdu.getCurrent());
+		}
+
+		return dynamicStatistics;
 	}
 }

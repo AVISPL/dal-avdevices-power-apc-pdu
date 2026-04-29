@@ -78,7 +78,7 @@ public final class Util {
 	 * @param value the input string to convert
 	 * @return a string with the first character capitalized, or {@code null} if the input is invalid
 	 */
-	private static String toTitleCase(String value) {
+	public static String toTitleCase(String value) {
 		if (StringUtils.isNullOrEmpty(value) || value.equals("null")) {
 			LOG.warn("The value is invalid(%s), returning null.".formatted(value));
 			return null;

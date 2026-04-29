@@ -22,7 +22,12 @@ public enum Command {
 	LOW_LOAD_WARNING("lowloadwarning"),
 	NEAR_OVERLOAD_WARNING("nearoverloadwarning"),
 	OVERLOAD_RESTRICTION("overloadrestriction"),
-	OVERLOAD_ALARM("overloadalarm");
+	OVERLOAD_ALARM("overloadalarm"),
+	LIST("list"),
+	STATUS("status"),
+	POWER_OFF_DELAY("poweroffdelay"),
+	POWER_ON_DELAY("powerondelay"),
+	REBOOT_DURATION("rebootduration");
 
 	String request;
 
