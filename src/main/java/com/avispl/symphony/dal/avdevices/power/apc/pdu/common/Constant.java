@@ -17,10 +17,18 @@ public final class Constant {
 	public static final String PROMPT_COMMAND = "APC>";
 	public static final String NOT_AVAILABLE = "N/A";
 	public static final String EMPTY = "";
+	public static final String HASH = "#";
+	public static final int MAX_PHASE = 3;
+	public static final String NEVER = "never";
+	public static final String MIN_VALUE = "0";
 
 	//	Format
 	public static final Pattern ERROR_RESPONSE_PATTERN = Pattern.compile("(?m)^\\s*E10\\s*$");
+	public static final Pattern VALUE_WITH_UNIT_PATTERN = Pattern.compile("(\\d+(?:\\.\\d+)?)\\s*(A|VA|W)");
+	public static final Pattern TIME_SECONDS_PATTERN = Pattern.compile("(\\d+)\\s*seconds");
+	public static final Pattern OVERLOAD_SETTING_PATTERN = Pattern.compile("Overload restriction is (\\S+)");
 
 	//	Group
 	public static final String ADAPTER_METADATA_GROUP = "AdapterMetadata";
+	public static final String CONFIGURATION_GROUP = "Configuration";
 }

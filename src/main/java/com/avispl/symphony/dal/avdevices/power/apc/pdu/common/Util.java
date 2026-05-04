@@ -1,6 +1,9 @@
 /** Copyright (c) 2026 AVI-SPL, Inc. All Rights Reserved. */
 package com.avispl.symphony.dal.avdevices.power.apc.pdu.common;
 
+import java.util.Optional;
+import java.util.regex.Matcher;
+
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
@@ -76,7 +79,7 @@ public final class Util {
 	 * @param value the input string to convert
 	 * @return a string with the first character capitalized, or {@code null} if the input is invalid
 	 */
-	private static String toTitleCase(String value) {
+	public static String toTitleCase(String value) {
 		if (StringUtils.isNullOrEmpty(value) || value.equals("null")) {
 			LOG.warn("The value is invalid(%s), returning null.".formatted(value));
 			return null;
@@ -176,17 +179,55 @@ public final class Util {
 	}
 
 	/**
-	 * Extracts the numeric portion from the given input string by removing all
-	 * non-numeric characters except digits, decimal point ('.'), and minus sign ('-').
+	 * Extracts a value from the given input string based on predefined patterns.
 	 *
-	 * <p>This method is useful for quickly normalizing values that include units,
-	 * such as "12A", "5.5kW", or "-3.3V".
-	 *
-	 * @param input the input string containing a numeric value with optional unit
-	 * @return a string containing only numeric characters, decimal point, and minus sign;
-	 * or an empty string if no numeric characters are found
+	 * @param input the raw input string
+	 * @return an {@link Optional} containing the extracted value if matched;
+	 *         otherwise {@link Optional#empty()}
 	 */
-	public static String extractUnit(String input) {
-		return input.replaceAll("[^\\d.-]", Constant.EMPTY);
+	public static Optional<String> extractValue(String input) {
+		if (input == null || input.isBlank()) {
+			LOG.warn("Input is null or blank; returning empty optional");
+			return Optional.empty();
+		}
+		try {
+			Matcher matcher;
+
+			matcher = Constant.OVERLOAD_SETTING_PATTERN.matcher(input);
+			if (matcher.find()) {
+				return Optional.ofNullable(matcher.group(1));
+			}
+			matcher = Constant.TIME_SECONDS_PATTERN.matcher(input);
+			if (matcher.find()) {
+				return Optional.ofNullable(matcher.group(1));
+			}
+			matcher = Constant.VALUE_WITH_UNIT_PATTERN.matcher(input);
+			if (matcher.find()) {
+				return Optional.ofNullable(roundValue(matcher.group(1)));
+			}
+			if (input.contains(Constant.NEVER)) {
+				return Optional.of(Constant.NEVER);
+			}
+			LOG.warn("Input '%s' does not match any known pattern; returning empty optional".formatted(input));
+			return Optional.empty();
+		} catch (Exception e) {
+			LOG.error("Failed to extract value from input '%s'; returning empty optional".formatted(input), e);
+			return Optional.empty();
+		}
+	}
+
+	/**
+	 * Rounds a numeric string value to the nearest integer.
+	 *
+	 * @param input the numeric string
+	 * @return rounded value as string, or {@code null} if parsing fails
+	 */
+	private static String roundValue(String input) {
+		try {
+			return String.valueOf(Math.round(Double.parseDouble(input)));
+		} catch (Exception e) {
+			LOG.error("Failed to round value from input '%s'".formatted(input), e);
+			return null;
+		}
 	}
 }

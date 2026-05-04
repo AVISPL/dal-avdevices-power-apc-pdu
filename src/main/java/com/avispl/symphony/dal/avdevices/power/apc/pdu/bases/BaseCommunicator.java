@@ -35,7 +35,14 @@ public abstract class BaseCommunicator extends SshCommunicator {
 	@Override
 	protected void internalInit() throws Exception {
 		super.setCommandSuccessList(List.of(Constant.PROMPT_COMMAND, "Bye."));
-		super.setCommandErrorList(List.of("Error"));
+		super.setCommandErrorList(List.of(
+				"E100: Command does not exist.",
+				"E101: Invalid command arguments.",
+				"E102: User already exists.",
+				"E103: User does not exist.",
+				"E104: User does not have access to this command.",
+				"E200: Input error."
+		));
 		super.setLoginSuccessList(List.of(Constant.PROMPT_COMMAND));
 		super.setLoginErrorList(List.of("Login failed."));
 		super.internalInit();
@@ -81,6 +88,33 @@ public abstract class BaseCommunicator extends SshCommunicator {
 	}
 
 	/**
+	 * Sends a control command to the target device and validates the response.
+	 * <p>Propagates connection-related exceptions such as {@link SocketTimeoutException}
+	 * and {@link FailedLoginException} without wrapping.</p>
+	 *
+	 * @param request the command request to be sent
+	 * @throws SocketTimeoutException if the request times out
+	 * @throws FailedLoginException if authentication fails
+	 * @throws CommandFailureException if the response is invalid or indicates an error
+	 * @throws ResourceNotReachableException if an unexpected error occurs while sending the request
+	 */
+	protected void sendControl(String request) throws Exception {
+		try {
+			var response = super.send(request);
+			if (response == null || response.trim().isEmpty()) {
+				throw new CommandFailureException(this.host, request, response, 502);
+			}
+			if (Constant.ERROR_RESPONSE_PATTERN.matcher(response).find()) {
+				throw new CommandFailureException(this.host, request, response, 400);
+			}
+		} catch (SocketTimeoutException | FailedLoginException e) {
+			throw e;
+		} catch (Exception e) {
+			throw new ResourceNotReachableException("Failed to send command %s".formatted(request), e);
+		}
+	}
+
+	/**
 	 * Normalizes raw device response into a clean, parable format.
 	 * <p>This method prepares the response for consistent parsing across different
 	 * devices or terminal formats.</p>
@@ -97,10 +131,9 @@ public abstract class BaseCommunicator extends SshCommunicator {
 		// normalize line break + remove prompt
 		response = response.replace("\r\n", "\n")
 				.replace("\r", "\n")
-				.replaceFirst(Pattern.quote(Constant.PROMPT_COMMAND) + "\\s*$", Constant.EMPTY)
-				.trim();
+				.replaceFirst(Pattern.quote(Constant.PROMPT_COMMAND) + "\\s*$", Constant.EMPTY);
 		// remove response status
-		response = response.replaceFirst("OK", Constant.EMPTY);
+		response = response.replaceFirst("OK", Constant.EMPTY).trim();
 
 		return response;
 	}

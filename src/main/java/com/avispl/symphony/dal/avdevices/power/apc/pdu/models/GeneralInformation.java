@@ -14,9 +14,6 @@ import com.avispl.symphony.dal.avdevices.power.apc.pdu.bases.BaseModel;
 /**
  * Represents general device information parsed from command response.
  *
- * <p>Contains system-level details such as OS version, model,
- * outlet configuration, and electrical specifications.</p>
- *
  * @author Kevin / Symphony Dev Team
  * @since 1.0.0
  */

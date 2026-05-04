@@ -15,7 +15,23 @@ import lombok.experimental.FieldDefaults;
 @RequiredArgsConstructor
 @Getter
 public enum Command {
-	VER("ver");
+	VER("ver"),
+	COLD_START_DELAY("pducoldstartdelay"),
+	POWER("power"),
+	CURRENT("current"),
+	LOW_LOAD_WARNING("lowloadwarning"),
+	NEAR_OVERLOAD_WARNING("nearoverloadwarning"),
+	OVERLOAD_RESTRICTION("overloadrestriction"),
+	OVERLOAD_ALARM("overloadalarm"),
+	LIST("list"),
+	STATUS("status"),
+	POWER_OFF_DELAY("poweroffdelay"),
+	POWER_ON_DELAY("powerondelay"),
+	REBOOT_DURATION("rebootduration");
 
 	String request;
+
+	public String getRequest(Object param) {
+		return this.request + " " + param;
+	}
 }
