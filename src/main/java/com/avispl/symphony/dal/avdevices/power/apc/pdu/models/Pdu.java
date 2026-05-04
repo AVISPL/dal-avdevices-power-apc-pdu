@@ -93,7 +93,7 @@ public class Pdu {
 		var phaseCurrents = threePhasesCurrent.getValue().split("\n");
 		for (String phaseCurrent : phaseCurrents) {
 			String[] comp = phaseCurrent.split(":");
-			this.currents.put(Integer.parseInt(comp[0]), comp[1].trim());
+			this.currents.put(Integer.parseInt(comp[0].trim()), comp[1].trim());
 		}
 	}
 
@@ -130,7 +130,7 @@ public class Pdu {
 				return;
 			}
 			var isMultipleValues = response.split("\n").length > 1;
-			this.value = isMultipleValues ? response : Util.extractValue(response);
+			this.value = isMultipleValues ? response : Util.extractValue(response).orElse(null);
 			if (this.value == null) {
 				log.warn("Skip parsing Pdu: unknown response '%s'".formatted(response));
 			}

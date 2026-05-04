@@ -47,12 +47,12 @@ public final class MonitoringHelper {
 			String propertyValue = switch (general) {
 				case AOS_VERSION -> generalInformation.getAosVersion();
 				case INPUT_TYPE -> generalInformation.getInputType();
-				case MAX_LOAD_CURRENT -> Util.extractValue(generalInformation.getMaxLoad());
+				case MAX_LOAD_CURRENT -> Util.extractValue(generalInformation.getMaxLoad()).orElse(null);
 				case MODEL -> generalInformation.getModel();
 				case OUTLET_TOTAL -> generalInformation.getOutlets();
 				case PDU_VERSION -> generalInformation.getPduVersion();
-				case ACTIVE_POWER -> Util.extractValue(pdu.getPowerW());
-				case APPARENT_POWER -> Util.extractValue(pdu.getPowerVA());
+				case ACTIVE_POWER -> Util.extractValue(pdu.getPowerW()).orElse(null);
+				case APPARENT_POWER -> Util.extractValue(pdu.getPowerVA()).orElse(null);
 				default -> throw new InvalidArgumentException("Unexpected General in COMMON_PROPERTIES: " + general);
 			};
 			properties.put(general.getDisplayName(), Util.mapToValue(propertyValue, !lowerCaseValues.contains(general)));
@@ -60,9 +60,9 @@ public final class MonitoringHelper {
 		if (is3Phases) {
 			for (General general : General.THREE_PHASE_PROPERTIES) {
 				String propertyValue = switch (general) {
-					case PHASE_1_CURRENT -> Util.extractValue(pdu.getCurrents().get(1));
-					case PHASE_2_CURRENT -> Util.extractValue(pdu.getCurrents().get(2));
-					case PHASE_3_CURRENT -> Util.extractValue(pdu.getCurrents().get(3));
+					case PHASE_1_CURRENT -> Util.extractValue(pdu.getCurrents().get(1)).orElse(null);
+					case PHASE_2_CURRENT -> Util.extractValue(pdu.getCurrents().get(2)).orElse(null);
+					case PHASE_3_CURRENT -> Util.extractValue(pdu.getCurrents().get(3)).orElse(null);
 					default -> throw new InvalidArgumentException("Unexpected General in THREE_PHASE_PROPERTIES: " + general);
 				};
 				properties.put(general.getDisplayName(), Util.mapToValue(propertyValue));
@@ -187,11 +187,17 @@ public final class MonitoringHelper {
 	public static Map<String, String> generateGeneralDynamicProperties(boolean is3Phases, Pdu pdu) {
 		var dynamicStatistics = new HashMap<String, String>();
 		if (is3Phases) {
-			dynamicStatistics.put(General.PHASE_1_CURRENT.getDisplayName(), pdu.getCurrents().get(0));
-			dynamicStatistics.put(General.PHASE_2_CURRENT.getDisplayName(), pdu.getCurrents().get(1));
-			dynamicStatistics.put(General.PHASE_3_CURRENT.getDisplayName(), pdu.getCurrents().get(2));
+			for (General general : General.THREE_PHASE_PROPERTIES) {
+				String propertyValue = switch (general) {
+					case PHASE_1_CURRENT -> Util.extractValue(pdu.getCurrents().get(1)).orElse(null);
+					case PHASE_2_CURRENT -> Util.extractValue(pdu.getCurrents().get(2)).orElse(null);
+					case PHASE_3_CURRENT -> Util.extractValue(pdu.getCurrents().get(3)).orElse(null);
+					default -> throw new InvalidArgumentException("Unexpected General in THREE_PHASE_PROPERTIES: " + general);
+				};
+				dynamicStatistics.put(general.getDisplayName(), Util.mapToValue(propertyValue));
+			}
 		} else {
-			dynamicStatistics.put(General.CURRENT.getDisplayName(), pdu.getCurrent());
+			dynamicStatistics.put(General.CURRENT.getDisplayName(), Util.mapToValue(pdu.getCurrent()));
 		}
 
 		return dynamicStatistics;

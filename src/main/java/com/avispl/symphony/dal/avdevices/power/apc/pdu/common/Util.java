@@ -1,6 +1,7 @@
 /** Copyright (c) 2026 AVI-SPL, Inc. All Rights Reserved. */
 package com.avispl.symphony.dal.avdevices.power.apc.pdu.common;
 
+import java.util.Optional;
 import java.util.regex.Matcher;
 
 import lombok.AccessLevel;
@@ -178,35 +179,40 @@ public final class Util {
 	}
 
 	/**
-	 * Extracts a numeric value from the given input string based on predefined patterns.
+	 * Extracts a value from the given input string based on predefined patterns.
 	 *
 	 * @param input the raw input string
-	 * @return extracted numeric value as string, or {@code null} if not found or failed
+	 * @return an {@link Optional} containing the extracted value if matched;
+	 *         otherwise {@link Optional#empty()}
 	 */
-	public static String extractValue(String input) {
+	public static Optional<String> extractValue(String input) {
+		if (input == null || input.isBlank()) {
+			LOG.warn("Input is null or blank; returning empty optional");
+			return Optional.empty();
+		}
 		try {
 			Matcher matcher;
 
 			matcher = Constant.OVERLOAD_SETTING_PATTERN.matcher(input);
 			if (matcher.find()) {
-				return matcher.group(1);
+				return Optional.ofNullable(matcher.group(1));
 			}
 			matcher = Constant.TIME_SECONDS_PATTERN.matcher(input);
 			if (matcher.find()) {
-				return matcher.group(1);
+				return Optional.ofNullable(matcher.group(1));
 			}
 			matcher = Constant.VALUE_WITH_UNIT_PATTERN.matcher(input);
 			if (matcher.find()) {
-				return roundValue(matcher.group(1));
+				return Optional.ofNullable(roundValue(matcher.group(1)));
 			}
 			if (input.contains(Constant.NEVER)) {
-				return Constant.NEVER;
+				return Optional.of(Constant.NEVER);
 			}
-			LOG.warn("Input '%s' does not match any known pattern; returning null".formatted(input));
-			return null;
+			LOG.warn("Input '%s' does not match any known pattern; returning empty optional".formatted(input));
+			return Optional.empty();
 		} catch (Exception e) {
-			LOG.error("Failed to extract value from input '%s'".formatted(input), e);
-			return null;
+			LOG.error("Failed to extract value from input '%s'; returning empty optional".formatted(input), e);
+			return Optional.empty();
 		}
 	}
 

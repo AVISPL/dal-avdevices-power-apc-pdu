@@ -41,7 +41,7 @@ public class Outlet {
 		for (String rawLine : rawLines) {
 			var comp = rawLine.split(":");
 			var outletDetail = this.outletDetails.get(comp[0]);
-			outletDetail.powerOffDelay = Util.extractValue(comp[2]);
+			outletDetail.powerOffDelay = Util.extractValue(comp[2]).orElse(null);
 		}
 	}
 
@@ -50,7 +50,7 @@ public class Outlet {
 		for (String rawLine : rawLines) {
 			var comp = rawLine.split(":");
 			var outletDetail = this.outletDetails.get(comp[0]);
-			outletDetail.powerOnDelay = Util.extractValue(comp[2]);
+			outletDetail.powerOnDelay = Util.extractValue(comp[2]).orElse(null);
 		}
 	}
 
@@ -59,7 +59,7 @@ public class Outlet {
 		for (String rawLine : rawLines) {
 			var comp = rawLine.split(":");
 			var outletDetail = this.outletDetails.get(comp[0]);
-			outletDetail.rebootDuration = Util.extractValue(comp[2]);
+			outletDetail.rebootDuration = Util.extractValue(comp[2]).orElse(null);
 		}
 	}
 
