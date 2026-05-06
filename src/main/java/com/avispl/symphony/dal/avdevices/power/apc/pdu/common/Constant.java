@@ -21,9 +21,12 @@ public final class Constant {
 	public static final int MAX_PHASE = 3;
 	public static final String NEVER = "never";
 	public static final String MIN_VALUE = "0";
+	public static final String UNDERSCORE = "_";
+	public static final String SPACE = " ";
+	public static final String COLON = ":";
 
 	//	Format
-	public static final Pattern ERROR_RESPONSE_PATTERN = Pattern.compile("(?m)^\\s*E10\\s*$");
+	public static final Pattern ERROR_RESPONSE_PATTERN = Pattern.compile("(?m)^\\s*E(?:10|20)");
 	public static final Pattern VALUE_WITH_UNIT_PATTERN = Pattern.compile("(\\d+(?:\\.\\d+)?)\\s*(A|VA|W)");
 	public static final Pattern TIME_SECONDS_PATTERN = Pattern.compile("(\\d+)\\s*seconds");
 	public static final Pattern OVERLOAD_SETTING_PATTERN = Pattern.compile("Overload restriction is (\\S+)");
@@ -31,4 +34,5 @@ public final class Constant {
 	//	Group
 	public static final String ADAPTER_METADATA_GROUP = "AdapterMetadata";
 	public static final String CONFIGURATION_GROUP = "Configuration";
+	public static final String OUTLET_GROUP = "Outlet_";
 }

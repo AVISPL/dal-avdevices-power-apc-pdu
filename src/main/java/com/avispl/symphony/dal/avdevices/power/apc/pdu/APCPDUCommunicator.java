@@ -23,12 +23,12 @@ import com.avispl.symphony.dal.avdevices.power.apc.pdu.helpers.MonitoringHelper;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.models.GeneralInformation;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.models.Pdu;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.models.Pdu.ResponsePdu;
-import com.avispl.symphony.dal.avdevices.power.apc.pdu.models.outlets.Outlet;
-import com.avispl.symphony.dal.avdevices.power.apc.pdu.models.outlets.Outlet.ResponseOutlet;
-import com.avispl.symphony.dal.avdevices.power.apc.pdu.models.outlets.OutletList;
+import com.avispl.symphony.dal.avdevices.power.apc.pdu.models.outlets.Outlets;
+import com.avispl.symphony.dal.avdevices.power.apc.pdu.models.outlets.Outlets.ResponseOutlets;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.types.Command;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.types.InputType;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.types.properties.AdapterMetadata;
+import com.avispl.symphony.dal.util.StringUtils;
 
 /**
  * APCPDUCommunicator class
@@ -51,7 +51,7 @@ public class APCPDUCommunicator extends BaseCommunicator implements Monitorable,
 	/** Indicates whether the PDU has a {@link InputType#THREE_PHASE}, used to determine statistic properties */
 	private boolean is3PhasesPdu;
 	/** Stores outlets from {@link Command} */
-	private OutletList outletList;
+	private Outlets outlets;
 
 	public APCPDUCommunicator() {
 		this.localExtendedStatistics = new ExtendedStatistics();
@@ -61,7 +61,7 @@ public class APCPDUCommunicator extends BaseCommunicator implements Monitorable,
 		this.adapterInitializationTimestamp = System.currentTimeMillis();
 		this.generalInformation = new GeneralInformation();
 		this.pdu = new Pdu();
-		this.outletList = new OutletList();
+		this.outlets = new Outlets();
 	}
 
 	@Override
@@ -72,7 +72,7 @@ public class APCPDUCommunicator extends BaseCommunicator implements Monitorable,
 
 	@Override
 	protected void internalDestroy() {
-		this.outletList = null;
+		this.outlets = null;
 		this.pdu = null;
 		this.generalInformation = null;
 		this.localExtendedStatistics.getStatistics().clear();
@@ -89,10 +89,10 @@ public class APCPDUCommunicator extends BaseCommunicator implements Monitorable,
 			var statistics = new HashMap<>(MonitoringHelper.generateGeneral(this.is3PhasesPdu, this.generalInformation, this.pdu));
 			statistics.putAll(MonitoringHelper.generateAdapterMetadata(this.versionProperties));
 			statistics.putAll(MonitoringHelper.generateConfiguration(this.is3PhasesPdu, this.pdu));
-			statistics.putAll(MonitoringHelper.generateOutlets(this.outletList));
+			statistics.putAll(MonitoringHelper.generateOutlets(this.outlets));
 
 			var controllableProperties = ControllerHelper.generateConfigurationControllers(this.is3PhasesPdu, this.pdu);
-			controllableProperties.addAll(ControllerHelper.generateOutletsControllers(this.outletList));
+			controllableProperties.addAll(ControllerHelper.generateOutletsControllers(this.outlets));
 
 			this.localExtendedStatistics.setStatistics(statistics);
 			this.localExtendedStatistics.setControllableProperties(controllableProperties);
@@ -111,6 +111,8 @@ public class APCPDUCommunicator extends BaseCommunicator implements Monitorable,
 			var value = controllableProperty.getValue();
 			if (property.startsWith(Constant.CONFIGURATION_GROUP)) {
 				this.sendControl(ControllerHelper.generateConfigurationRequest(property, value, this.pdu));
+			} else if (property.contains(Constant.OUTLET_GROUP)) {
+				this.sendControl(ControllerHelper.generateOutletRequest(property, value));
 			} else {
 				this.log.warn("Unsupported property to control: '%s'".formatted(property));
 			}
@@ -171,12 +173,12 @@ public class APCPDUCommunicator extends BaseCommunicator implements Monitorable,
 			this.pdu.setOverloadAlarm(this.send(Command.OVERLOAD_ALARM.getRequest(), ResponsePdu.class));
 			this.pdu.setOverloadRestriction(this.send(Command.OVERLOAD_RESTRICTION.getRequest(), ResponsePdu.class));
 		}
-		this.outletList = this.send(Command.LIST.getRequest(), OutletList.class);
-		for (Outlet outlet : this.outletList.getOutlets()) {
-			outlet.setStatuses(this.send(Command.STATUS.getRequest(outlet.getOutlets()), ResponseOutlet.class));
-			outlet.setPowerOffDelays(this.send(Command.POWER_OFF_DELAY.getRequest(outlet.getOutlets()), ResponseOutlet.class));
-			outlet.setPowerOnDelays(this.send(Command.POWER_ON_DELAY.getRequest(outlet.getOutlets()), ResponseOutlet.class));
-			outlet.setRebootDurations(this.send(Command.REBOOT_DURATION.getRequest(outlet.getOutlets()), ResponseOutlet.class));
+		this.outlets = this.send(Command.LIST.getRequest(), Outlets.class);
+		if (StringUtils.isNotNullOrEmpty(this.outlets.getOutletNumbers())) {
+			this.outlets.setStatuses(this.send(Command.STATUS.getRequest(this.outlets.getOutletNumbers()), ResponseOutlets.class));
+			this.outlets.setPowerOffDelays(this.send(Command.POWER_OFF_DELAY.getRequest(this.outlets.getOutletNumbers()), ResponseOutlets.class));
+			this.outlets.setPowerOnDelays(this.send(Command.POWER_ON_DELAY.getRequest(this.outlets.getOutletNumbers()), ResponseOutlets.class));
+			this.outlets.setRebootDurations(this.send(Command.REBOOT_DURATION.getRequest(this.outlets.getOutletNumbers()), ResponseOutlets.class));
 		}
 	}
 }

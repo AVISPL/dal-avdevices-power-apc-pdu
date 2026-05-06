@@ -20,6 +20,7 @@ import com.avispl.symphony.dal.avdevices.power.apc.pdu.common.Constant;
 @Getter
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public enum Configuration {
+	UNDEFINED(Constant.NOT_AVAILABLE),
 	COLD_START_DELAY(Constant.CONFIGURATION_GROUP + "#ColdStartDelay"),
 	COLD_START_DELAY_SEC(Constant.CONFIGURATION_GROUP + "#ColdStartDelay(sec)"),
 	LOW_LOAD_WARNING(Constant.CONFIGURATION_GROUP + "#LowLoadWarning(A)"),

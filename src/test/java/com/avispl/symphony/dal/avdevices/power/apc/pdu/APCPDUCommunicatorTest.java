@@ -16,6 +16,7 @@ import com.avispl.symphony.dal.avdevices.power.apc.pdu.types.InputType;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.types.properties.AdapterMetadata;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.types.properties.Configuration;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.types.properties.General;
+import com.avispl.symphony.dal.avdevices.power.apc.pdu.types.properties.Outlet;
 
 class APCPDUCommunicatorTest {
 	private APCPDUCommunicator communicator;
@@ -56,7 +57,7 @@ class APCPDUCommunicatorTest {
 
 		Assertions.assertEquals(expectedSize, verifiedStatistics.size(), "General properties doesn't match size");
 		verifiedStatistics.forEach((key, value) -> {
-			Assertions.assertFalse(key.contains("#"), "Invalid field: " + key);
+			Assertions.assertFalse(key.contains(Constant.HASH), "Invalid field: " + key);
 			Assertions.assertTrue(this.isValidValue(value), "Key '%s'. Invalid value: %s".formatted(key, value));
 		});
 	}
@@ -84,7 +85,7 @@ class APCPDUCommunicatorTest {
 
 		Assertions.assertEquals(expectedSize, verifiedStatistics.size(), Constant.CONFIGURATION_GROUP + " properties doesn't match size");
 		verifiedStatistics.forEach((key, value) -> {
-			Assertions.assertTrue(key.startsWith(Constant.CONFIGURATION_GROUP + "#"), "Invalid field: " + key);
+			Assertions.assertTrue(key.startsWith(Constant.CONFIGURATION_GROUP + Constant.HASH), "Invalid field: " + key);
 			Assertions.assertTrue(this.isValidValue(value), "Key '%s'. Invalid value: %s".formatted(key, value));
 		});
 	}
@@ -101,9 +102,42 @@ class APCPDUCommunicatorTest {
 		Assertions.assertEquals(verifiedValue, statistics.get(verifiedProperty.getDisplayName()));
 	}
 
+	@Test
+	void testGetMultipleStatistics_withOutlet() throws Exception {
+		var extendedStatistics = (ExtendedStatistics) this.communicator.getMultipleStatistics().get(0);
+		var verifiedStatistics = this.filterGroupStatistics(extendedStatistics.getStatistics(), Constant.OUTLET_GROUP);
+
+		verifiedStatistics.forEach((key, value) -> {
+			Assertions.assertTrue(key.contains(Constant.OUTLET_GROUP), "Invalid field: " + key);
+			Assertions.assertTrue(this.isValidValue(value), "Key '%s'. Invalid value: %s".formatted(key, value));
+		});
+	}
+
+	@Test
+	void testControlProperty_withOutlet() throws Exception {
+		var verifiedProperty = Outlet.REBOOT.getDisplayName("Local_Apc_Outlet_01");
+		var controllableProperty = new ControllableProperty(verifiedProperty, "1", null);
+
+		this.communicator.getMultipleStatistics();
+		this.communicator.controlProperty(controllableProperty);
+		var extendedStatistics = (ExtendedStatistics) this.communicator.getMultipleStatistics().get(0);
+		var verifiedStatistics = this.filterGroupStatistics(extendedStatistics.getStatistics(), Constant.OUTLET_GROUP);
+
+		Assertions.assertTrue(verifiedStatistics.containsKey(verifiedProperty));
+		Assertions.assertEquals("On", verifiedStatistics.get(verifiedProperty));
+	}
+
 	private Map<String, String> filterGroupStatistics(Map<String, String> statistics, String groupName) {
 		return statistics.entrySet().stream()
-				.filter(e -> groupName == null ? !e.getKey().contains("#") : e.getKey().startsWith(groupName))
+				.filter(e -> {
+					if (groupName == null) {
+						return !e.getKey().contains(Constant.HASH);
+					} else if (groupName.contains(Constant.OUTLET_GROUP)) {
+						return e.getKey().contains(Constant.OUTLET_GROUP);
+					} else {
+						return e.getKey().startsWith(groupName);
+					}
+				})
 				.collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 	}
 

@@ -5,6 +5,8 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 
+import com.avispl.symphony.dal.avdevices.power.apc.pdu.common.Constant;
+
 /**
  * Represents supported CLI commands for the APC PDU communicator.
  *
@@ -27,11 +29,14 @@ public enum Command {
 	STATUS("status"),
 	POWER_OFF_DELAY("poweroffdelay"),
 	POWER_ON_DELAY("powerondelay"),
-	REBOOT_DURATION("rebootduration");
+	REBOOT("reboot"),
+	REBOOT_DURATION("rebootduration"),
+	ON("on"),
+	OFF("off");
 
 	String request;
 
 	public String getRequest(Object param) {
-		return this.request + " " + param;
+		return this.request + Constant.SPACE + param;
 	}
 }
