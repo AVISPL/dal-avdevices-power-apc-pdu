@@ -22,6 +22,8 @@ public final class Constant {
 	public static final String NEVER = "never";
 	public static final String MIN_VALUE = "0";
 	public static final String UNDERSCORE = "_";
+	public static final String SPACE = " ";
+	public static final String COLON = ":";
 
 	//	Format
 	public static final Pattern ERROR_RESPONSE_PATTERN = Pattern.compile("(?m)^\\s*E(?:10|20)");

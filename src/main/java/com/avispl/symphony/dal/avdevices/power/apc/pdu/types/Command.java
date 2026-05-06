@@ -5,6 +5,8 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 
+import com.avispl.symphony.dal.avdevices.power.apc.pdu.common.Constant;
+
 /**
  * Represents supported CLI commands for the APC PDU communicator.
  *
@@ -35,6 +37,6 @@ public enum Command {
 	String request;
 
 	public String getRequest(Object param) {
-		return this.request + " " + param;
+		return this.request + Constant.SPACE + param;
 	}
 }

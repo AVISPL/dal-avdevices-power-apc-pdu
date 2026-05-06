@@ -13,10 +13,10 @@ import com.avispl.symphony.dal.avdevices.power.apc.pdu.common.Constant;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.common.Logger;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.common.Util;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.models.Pdu;
-import com.avispl.symphony.dal.avdevices.power.apc.pdu.models.outlets.OutletList;
+import com.avispl.symphony.dal.avdevices.power.apc.pdu.models.outlets.Outlets;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.types.Command;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.types.properties.Configuration;
-import com.avispl.symphony.dal.avdevices.power.apc.pdu.types.properties.Outlets;
+import com.avispl.symphony.dal.avdevices.power.apc.pdu.types.properties.Outlet;
 import com.avispl.symphony.dal.util.ControllablePropertyFactory;
 import com.avispl.symphony.dal.util.StringUtils;
 
@@ -39,9 +39,9 @@ public final class ControllerHelper {
 	 */
 	public static List<AdvancedControllableProperty> generateConfigurationControllers(boolean is3Phases, Pdu pdu) {
 		var controllableProperties = new ArrayList<>(List.of(
-				ControllablePropertyFactory.createSwitch(Configuration.COLD_START_DELAY.getDisplayName(), pdu.isNeverColdStartDelay() ? 0 : 1)
+				ControllablePropertyFactory.createSwitch(Configuration.COLD_START_DELAY.getDisplayName(), pdu.isColdStartDelayDisabled() ? 0 : 1)
 		));
-		if (!pdu.isNeverColdStartDelay()) {
+		if (!pdu.isColdStartDelayDisabled()) {
 			controllableProperties.add(
 					ControllablePropertyFactory.createSlider(Configuration.COLD_START_DELAY_SEC.getDisplayName(), 0f, 300f, Float.valueOf(pdu.getColdStartDelay()))
 			);
@@ -112,33 +112,30 @@ public final class ControllerHelper {
 	}
 
 	/**
-	 * Generates a list of controllable outlets properties for the given {@link OutletList}.
+	 * Generates a list of controllable outlets properties for the given {@link Outlets}.
 	 *
-	 * @param outletList the source of outlet data (must not be {@code null})
+	 * @param outlets the source of outlet data (must not be {@code null})
 	 * @return a list of {@link AdvancedControllableProperty} representing outlets controls; never {@code null}
 	 */
-	public static List<AdvancedControllableProperty> generateOutletsControllers(OutletList outletList) {
+	public static List<AdvancedControllableProperty> generateOutletsControllers(Outlets outlets) {
 		var controllableProperties = new ArrayList<AdvancedControllableProperty>();
-		outletList.getOutletUsers().forEach(outletUser -> {
-			var prefixName = new StringBuilder();
-			prefixName.append(Util.toTitleCase(outletUser.getSource())).append(Constant.UNDERSCORE);
-			prefixName.append(Util.toTitleCase(outletUser.getUsername())).append(Constant.UNDERSCORE);
-			prefixName.append(Constant.OUTLET_GROUP);
+		outlets.getOutletUsers().forEach(outletUser -> {
+			var prefixName = Util.buildOutletPropertyPrefix(outletUser);
 			for (var outletNumber : outletUser.getOutletNumbers()) {
 				var propertyName = prefixName + "%02d".formatted(Integer.parseInt(outletNumber));
-				var outlet = outletList.getOutletDetails().get(outletNumber);
+				var outlet = outlets.getOutletDetails().get(outletNumber);
 				controllableProperties.addAll(List.of(
-						ControllablePropertyFactory.createSwitch(Outlets.POWER_OFF_DELAY.getDisplayName(propertyName), outlet.isNeverPowerOffDelay() ? 0 : 1),
-						ControllablePropertyFactory.createSwitch(Outlets.POWER_ON_DELAY.getDisplayName(propertyName), outlet.isNeverPowerOnDelay() ? 0 : 1),
-						ControllablePropertyFactory.createSwitch(Outlets.POWER_STATUS.getDisplayName(propertyName), mapToSwitchValue(outlet.getPowerStatus())),
-						ControllablePropertyFactory.createButton(Outlets.REBOOT.getDisplayName(propertyName), "Reboot", "Rebooting", 0L),
-						ControllablePropertyFactory.createNumeric(Outlets.REBOOT_DURATION_SEC.getDisplayName(propertyName), outlet.getRebootDuration())
+						ControllablePropertyFactory.createSwitch(Outlet.POWER_OFF_DELAY.getDisplayName(propertyName), outlet.isPowerOffDelayDisabled() ? 0 : 1),
+						ControllablePropertyFactory.createSwitch(Outlet.POWER_ON_DELAY.getDisplayName(propertyName), outlet.isPowerOnDelayDisabled() ? 0 : 1),
+						ControllablePropertyFactory.createSwitch(Outlet.POWER_STATUS.getDisplayName(propertyName), mapToSwitchValue(outlet.getPowerStatus())),
+						ControllablePropertyFactory.createButton(Outlet.REBOOT.getDisplayName(propertyName), "Reboot", "Rebooting", 0L),
+						ControllablePropertyFactory.createNumeric(Outlet.REBOOT_DURATION_SEC.getDisplayName(propertyName), outlet.getRebootDuration())
 				));
-				if (!outlet.isNeverPowerOffDelay()) {
-					controllableProperties.add(ControllablePropertyFactory.createNumeric(Outlets.POWER_OFF_DELAY_SEC.getDisplayName(propertyName), outlet.getPowerOffDelay()));
+				if (!outlet.isPowerOffDelayDisabled()) {
+					controllableProperties.add(ControllablePropertyFactory.createNumeric(Outlet.POWER_OFF_DELAY_SEC.getDisplayName(propertyName), outlet.getPowerOffDelay()));
 				}
-				if (!outlet.isNeverPowerOnDelay()) {
-					controllableProperties.add(ControllablePropertyFactory.createNumeric(Outlets.POWER_ON_DELAY_SEC.getDisplayName(propertyName), outlet.getPowerOnDelay()));
+				if (!outlet.isPowerOnDelayDisabled()) {
+					controllableProperties.add(ControllablePropertyFactory.createNumeric(Outlet.POWER_ON_DELAY_SEC.getDisplayName(propertyName), outlet.getPowerOnDelay()));
 				}
 			}
 		});
@@ -158,7 +155,7 @@ public final class ControllerHelper {
 		var propertyComponent = property.split(Constant.HASH);
 		var nameComponent = propertyComponent[0].split(Constant.UNDERSCORE);
 		var outletNumber = Integer.parseInt(nameComponent[nameComponent.length - 1]);
-		var outletProperty = Outlets.fromProperty(propertyComponent[1]);
+		var outletProperty = Outlet.fromProperty(propertyComponent[1]);
 		var param = buildOutletParam(outletNumber, outletProperty, value.toString());
 
 		return switch (outletProperty) {
@@ -198,13 +195,8 @@ public final class ControllerHelper {
 	 * @return formatted parameter string
 	 */
 	private static String buildParam(Integer phase, String property, String value) {
-		if (phase == null) {
-			return property.contains("OverloadRestriction") ? mapToStatusValue(value) : value;
-		}
-		if (property.contains("OverloadRestriction")) {
-			return phase + " " + mapToStatusValue(value);
-		}
-		return phase + " " + value;
+		var paramValue = property.contains("OverloadRestriction") ? Util.mapToStatusValue(value) : value;
+		return phase == null ? paramValue : phase + Constant.SPACE + paramValue;
 	}
 
 	/**
@@ -215,12 +207,17 @@ public final class ControllerHelper {
 	 * @param value the property value
 	 * @return the formatted outlet request parameter
 	 */
-	private static String buildOutletParam(int outletNumber, Outlets property, String value) {
-		if (Outlets.POWER_OFF_DELAY.equals(property) || Outlets.POWER_ON_DELAY.equals(property)) {
-			return outletNumber + " " + ("1".equals(value) ? Constant.MIN_VALUE : Constant.NEVER);
+	private static String buildOutletParam(int outletNumber, Outlet property, String value) {
+		var paramBuilder = new StringBuilder().append(outletNumber);
+		if (Outlet.REBOOT_DURATION_SEC.equals(property)) {
+			paramBuilder.append(Constant.COLON).append(value);
+		} else if (Outlet.POWER_OFF_DELAY.equals(property) || Outlet.POWER_ON_DELAY.equals(property)) {
+			paramBuilder.append(Constant.SPACE).append("1".equals(value) ? Constant.MIN_VALUE : Constant.NEVER);
+		} else {
+			paramBuilder.append(Constant.SPACE).append(value);
 		}
 
-		return outletNumber + " " + value;
+		return paramBuilder.toString();
 	}
 
 	private static int mapToSwitchValue(String input) {
@@ -233,15 +230,6 @@ public final class ControllerHelper {
 		} catch (Exception e) {
 			LOG.error("Failed to map to switch value from input '%s'".formatted(input), e);
 			return 0;
-		}
-	}
-
-	private static String mapToStatusValue(String input) {
-		try {
-			return "1".equals(input) ? "on" : "off";
-		} catch (Exception e) {
-			LOG.error("Failed to map to status value from input '%s'".formatted(input), e);
-			return "off";
 		}
 	}
 }

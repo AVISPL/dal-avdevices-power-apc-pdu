@@ -16,7 +16,7 @@ import com.avispl.symphony.dal.avdevices.power.apc.pdu.types.InputType;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.types.properties.AdapterMetadata;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.types.properties.Configuration;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.types.properties.General;
-import com.avispl.symphony.dal.avdevices.power.apc.pdu.types.properties.Outlets;
+import com.avispl.symphony.dal.avdevices.power.apc.pdu.types.properties.Outlet;
 
 class APCPDUCommunicatorTest {
 	private APCPDUCommunicator communicator;
@@ -115,7 +115,7 @@ class APCPDUCommunicatorTest {
 
 	@Test
 	void testControlProperty_withOutlet() throws Exception {
-		var verifiedProperty = Outlets.REBOOT.getDisplayName("Local_Apc_Outlet_01");
+		var verifiedProperty = Outlet.REBOOT.getDisplayName("Local_Apc_Outlet_01");
 		var controllableProperty = new ControllableProperty(verifiedProperty, "1", null);
 
 		this.communicator.getMultipleStatistics();

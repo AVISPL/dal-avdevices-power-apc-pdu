@@ -24,16 +24,16 @@ import com.avispl.symphony.dal.avdevices.power.apc.pdu.common.Util;
  */
 @Getter
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class OutletList extends BaseModel {
+public class Outlets extends BaseModel {
 	final List<OutletUser> outletUsers = new ArrayList<>();
 	String outletNumbers;
-	final Map<String, Outlet> outletDetails = new HashMap<>();
+	final Map<String, OutletDetail> outletDetails = new HashMap<>();
 
 	public void setStatuses(ResponseOutlets status) {
 		var rawLines = status.value.split("\n");
 		for (String rawLine : rawLines) {
-			var comp = rawLine.split(":");
-			var outletDetail = this.outletDetails.computeIfAbsent(comp[0], key -> new Outlet());
+			var comp = rawLine.split(Constant.COLON);
+			var outletDetail = this.outletDetails.computeIfAbsent(comp[0], key -> new OutletDetail());
 			outletDetail.setName(comp[2]);
 			outletDetail.setPowerStatus(comp[1]);
 		}
@@ -42,29 +42,29 @@ public class OutletList extends BaseModel {
 	public void setPowerOffDelays(ResponseOutlets powerOffDelays) {
 		var rawLines = powerOffDelays.value.split("\n");
 		for (String rawLine : rawLines) {
-			var comp = rawLine.split(":");
-			var outletDetail = this.outletDetails.computeIfAbsent(comp[0], key -> new Outlet());
+			var comp = rawLine.split(Constant.COLON);
+			var outletDetail = this.outletDetails.computeIfAbsent(comp[0], key -> new OutletDetail());
 			var value = Util.extractValue(comp[2]).orElse(null);
 			outletDetail.setPowerOffDelay(value);
-			outletDetail.setNeverPowerOffDelay(Constant.NEVER.equals(value));
+			outletDetail.setPowerOffDelayDisabled(Constant.NEVER.equals(value));
 		}
 	}
 
 	public void setPowerOnDelays(ResponseOutlets powerOnDelays) {
 		var rawLines = powerOnDelays.value.split("\n");
 		for (String rawLine : rawLines) {
-			var comp = rawLine.split(":");
+			var comp = rawLine.split(Constant.COLON);
 			var outletDetail = this.outletDetails.get(comp[0]);
 			var value = Util.extractValue(comp[2]).orElse(null);
 			outletDetail.setPowerOnDelay(value);
-			outletDetail.setNeverPowerOnDelay(Constant.NEVER.equals(value));
+			outletDetail.setPowerOnDelayDisabled(Constant.NEVER.equals(value));
 		}
 	}
 
 	public void setRebootDurations(ResponseOutlets rebootDurations) {
 		var rawLines = rebootDurations.value.split("\n");
 		for (String rawLine : rawLines) {
-			var comp = rawLine.split(":");
+			var comp = rawLine.split(Constant.COLON);
 			var outletDetail = this.outletDetails.get(comp[0]);
 			outletDetail.setRebootDuration(Util.extractValue(comp[2]).orElse(null));
 		}
@@ -78,7 +78,7 @@ public class OutletList extends BaseModel {
 		}
 		var rawLines = response.split("\n");
 		for (String rawLine : rawLines) {
-			var comp = Arrays.stream(rawLine.split(":")).map(String::trim).toArray(String[]::new);
+			var comp = Arrays.stream(rawLine.split(Constant.COLON)).map(String::trim).toArray(String[]::new);
 			if (comp.length < 3) {
 				this.log.warn("Unknown response from list command: '%s'".formatted(response));
 			}

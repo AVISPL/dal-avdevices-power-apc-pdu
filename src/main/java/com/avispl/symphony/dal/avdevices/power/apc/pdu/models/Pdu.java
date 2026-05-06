@@ -24,7 +24,7 @@ import com.avispl.symphony.dal.avdevices.power.apc.pdu.common.Util;
 public class Pdu {
 	String coldStartDelay;
 	String oldColdStartDelay;
-	boolean isNeverColdStartDelay;
+	boolean isColdStartDelayDisabled;
 	String powerVA;
 	String powerW;
 	//	One phase Pdu
@@ -47,7 +47,7 @@ public class Pdu {
 	}
 
 	public String getColdStartDelay() {
-		return this.isNeverColdStartDelay ? Constant.MIN_VALUE : this.coldStartDelay;
+		return this.isColdStartDelayDisabled ? Constant.MIN_VALUE : this.coldStartDelay;
 	}
 
 	public void setColdStartDelay(ResponsePdu coldStartDelay) {
@@ -55,16 +55,16 @@ public class Pdu {
 		if (null == value) {
 			this.coldStartDelay = null;
 			this.oldColdStartDelay = null;
-			this.isNeverColdStartDelay = false;
+			this.isColdStartDelayDisabled = false;
 			return;
 		}
 		if (Constant.NEVER.equals(value)) {
 			var isNullOrNever = null == this.coldStartDelay || Constant.NEVER.equals(this.coldStartDelay);
 			this.oldColdStartDelay = isNullOrNever ? Constant.MIN_VALUE : this.coldStartDelay;
-			this.isNeverColdStartDelay = true;
+			this.isColdStartDelayDisabled = true;
 		} else {
 			this.oldColdStartDelay = null;
-			this.isNeverColdStartDelay = false;
+			this.isColdStartDelayDisabled = false;
 		}
 		this.coldStartDelay = value;
 	}
@@ -92,7 +92,7 @@ public class Pdu {
 	public void set3PhasesCurrent(ResponsePdu threePhasesCurrent) {
 		var phaseCurrents = threePhasesCurrent.getValue().split("\n");
 		for (String phaseCurrent : phaseCurrents) {
-			String[] comp = phaseCurrent.split(":");
+			String[] comp = phaseCurrent.split(Constant.COLON);
 			this.currents.put(Integer.parseInt(comp[0].trim()), comp[1].trim());
 		}
 	}

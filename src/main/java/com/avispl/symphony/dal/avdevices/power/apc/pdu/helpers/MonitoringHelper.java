@@ -14,12 +14,12 @@ import com.avispl.symphony.dal.avdevices.power.apc.pdu.common.Constant;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.common.Util;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.models.GeneralInformation;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.models.Pdu;
-import com.avispl.symphony.dal.avdevices.power.apc.pdu.models.outlets.OutletList;
+import com.avispl.symphony.dal.avdevices.power.apc.pdu.models.outlets.Outlets;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.types.InputType;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.types.properties.AdapterMetadata;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.types.properties.Configuration;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.types.properties.General;
-import com.avispl.symphony.dal.avdevices.power.apc.pdu.types.properties.Outlets;
+import com.avispl.symphony.dal.avdevices.power.apc.pdu.types.properties.Outlet;
 
 /**
  * Helper class for generating monitoring properties.
@@ -104,7 +104,7 @@ public final class MonitoringHelper {
 	public static Map<String, String> generateConfiguration(boolean is3Phases, Pdu pdu) {
 		var properties = new HashMap<String, String>();
 		properties.put(Configuration.COLD_START_DELAY_SEC.getDisplayName(), Util.mapToValue(pdu.getColdStartDelay()));
-		properties.put(Configuration.COLD_START_DELAY.getDisplayName(), pdu.isNeverColdStartDelay() ? "Off" : "On");
+		properties.put(Configuration.COLD_START_DELAY.getDisplayName(), pdu.isColdStartDelayDisabled() ? "Off" : "On");
 		if (is3Phases) {
 			for (Configuration configuration : Configuration.THREE_PHASE_PROPERTIES) {
 				String propertyValue = switch (configuration) {
@@ -140,29 +140,26 @@ public final class MonitoringHelper {
 	}
 
 	/**
-	 * Generates a map of outlets properties for the given {@link OutletList}.
+	 * Generates a map of outlets properties for the given {@link Outlets}.
 	 *
-	 * @param outletList the source of outlets data (must not be {@code null})
+	 * @param outlets the source of outlets data (must not be {@code null})
 	 * @return a map of outlets display names to their corresponding values; never {@code null}
-	 * @throws InvalidArgumentException if an unexpected {@link OutletList} value is encountered
+	 * @throws InvalidArgumentException if an unexpected {@link Outlets} value is encountered
 	 */
-	public static Map<String, String> generateOutlets(OutletList outletList) {
+	public static Map<String, String> generateOutlets(Outlets outlets) {
 		var properties = new HashMap<String, String>();
-		outletList.getOutletUsers().forEach(outletUser -> {
-			var prefixName = new StringBuilder();
-			prefixName.append(Util.toTitleCase(outletUser.getSource())).append(Constant.UNDERSCORE);
-			prefixName.append(Util.toTitleCase(outletUser.getUsername())).append(Constant.UNDERSCORE);
-			prefixName.append(Constant.OUTLET_GROUP);
+		outlets.getOutletUsers().forEach(outletUser -> {
+			var prefixName = Util.buildOutletPropertyPrefix(outletUser);
 			for (var outletNumber : outletUser.getOutletNumbers()) {
-				var outlet = outletList.getOutletDetails().get(outletNumber);
-				for (Outlets property : Outlets.values()) {
+				var outlet = outlets.getOutletDetails().get(outletNumber);
+				for (Outlet property : Outlet.values()) {
 					var propertyName = prefixName + "%02d".formatted(Integer.parseInt(outletNumber));
 					var propertyValue = switch (property) {
 						case NAME -> outlet.getName();
-						case POWER_OFF_DELAY -> outlet.isNeverPowerOffDelay() ? "Off" : "On";
-						case POWER_OFF_DELAY_SEC -> outlet.isNeverPowerOffDelay() ? Constant.MIN_VALUE : outlet.getPowerOffDelay();
-						case POWER_ON_DELAY -> outlet.isNeverPowerOnDelay() ? "Off" : "On";
-						case POWER_ON_DELAY_SEC -> outlet.isNeverPowerOnDelay() ? Constant.MIN_VALUE : outlet.getPowerOnDelay();
+						case POWER_OFF_DELAY -> outlet.isPowerOffDelayDisabled() ? "Off" : "On";
+						case POWER_OFF_DELAY_SEC -> outlet.isPowerOffDelayDisabled() ? Constant.MIN_VALUE : outlet.getPowerOffDelay();
+						case POWER_ON_DELAY -> outlet.isPowerOnDelayDisabled() ? "Off" : "On";
+						case POWER_ON_DELAY_SEC -> outlet.isPowerOnDelayDisabled() ? Constant.MIN_VALUE : outlet.getPowerOnDelay();
 						case POWER_STATUS -> outlet.getPowerStatus().toLowerCase();
 						case REBOOT -> Constant.NOT_AVAILABLE;
 						case REBOOT_DURATION_SEC -> outlet.getRebootDuration();

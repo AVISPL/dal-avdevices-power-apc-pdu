@@ -7,6 +7,7 @@ import java.util.regex.Matcher;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
+import com.avispl.symphony.dal.avdevices.power.apc.pdu.models.outlets.OutletUser;
 import com.avispl.symphony.dal.util.StringUtils;
 
 /**
@@ -228,6 +229,21 @@ public final class Util {
 		} catch (Exception e) {
 			LOG.error("Failed to round value from input '%s'".formatted(input), e);
 			return null;
+		}
+	}
+
+	public static String buildOutletPropertyPrefix(OutletUser outletUser) {
+		return toTitleCase(outletUser.getSource()) + Constant.UNDERSCORE
+				+ toTitleCase(outletUser.getUsername()) + Constant.UNDERSCORE
+				+ Constant.OUTLET_GROUP;
+	}
+
+	public static String mapToStatusValue(String input) {
+		try {
+			return "1".equals(input) ? "on" : "off";
+		} catch (Exception e) {
+			LOG.error("Failed to map to status value from input '%s'".formatted(input), e);
+			return "off";
 		}
 	}
 }

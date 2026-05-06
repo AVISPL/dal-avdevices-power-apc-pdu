@@ -15,12 +15,12 @@ import lombok.experimental.FieldDefaults;
 @Getter
 @Setter
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class Outlet {
+public class OutletDetail {
 	String name;
 	String powerOffDelay;
-	boolean isNeverPowerOffDelay;
+	boolean isPowerOffDelayDisabled;
 	String powerOnDelay;
-	boolean isNeverPowerOnDelay;
+	boolean isPowerOnDelayDisabled;
 	String powerStatus;
 	String rebootDuration;
 }

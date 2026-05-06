@@ -20,7 +20,7 @@ import com.avispl.symphony.dal.avdevices.power.apc.pdu.common.Constant;
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 @Getter
-public enum Outlets {
+public enum Outlet {
 	NAME("Name"),
 	POWER_OFF_DELAY("PowerOffDelay"),
 	POWER_OFF_DELAY_SEC("PowerOffDelay(sec)"),
@@ -36,7 +36,7 @@ public enum Outlets {
 		return groupName + Constant.HASH + this.property;
 	}
 
-	public static Outlets fromProperty(String property) {
+	public static Outlet fromProperty(String property) {
 		return Arrays.stream(values()).filter(p -> p.property.equals(property)).findFirst()
 				.orElseThrow(() -> new InvalidArgumentException("Unknown outlet property: '%s'".formatted(property)));
 	}
