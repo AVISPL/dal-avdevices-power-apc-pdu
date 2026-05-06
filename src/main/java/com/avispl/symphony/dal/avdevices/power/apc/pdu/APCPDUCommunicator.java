@@ -9,17 +9,26 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Properties;
 
+import org.apache.commons.collections.CollectionUtils;
+
 import com.avispl.symphony.api.dal.control.Controller;
-import com.avispl.symphony.api.dal.dto.control.AdvancedControllableProperty;
 import com.avispl.symphony.api.dal.dto.control.ControllableProperty;
 import com.avispl.symphony.api.dal.dto.monitor.ExtendedStatistics;
 import com.avispl.symphony.api.dal.dto.monitor.Statistics;
 import com.avispl.symphony.api.dal.monitor.Monitorable;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.bases.BaseCommunicator;
+import com.avispl.symphony.dal.avdevices.power.apc.pdu.common.Constant;
+import com.avispl.symphony.dal.avdevices.power.apc.pdu.helpers.ControllerHelper;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.helpers.MonitoringHelper;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.models.GeneralInformation;
+import com.avispl.symphony.dal.avdevices.power.apc.pdu.models.Pdu;
+import com.avispl.symphony.dal.avdevices.power.apc.pdu.models.Pdu.ResponsePdu;
+import com.avispl.symphony.dal.avdevices.power.apc.pdu.models.outlets.Outlets;
+import com.avispl.symphony.dal.avdevices.power.apc.pdu.models.outlets.Outlets.ResponseOutlets;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.types.Command;
+import com.avispl.symphony.dal.avdevices.power.apc.pdu.types.InputType;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.types.properties.AdapterMetadata;
+import com.avispl.symphony.dal.util.StringUtils;
 
 /**
  * APCPDUCommunicator class
@@ -35,8 +44,14 @@ public class APCPDUCommunicator extends BaseCommunicator implements Monitorable,
 	/** Device adapter instantiation timestamp. */
 	private final long adapterInitializationTimestamp;
 
-	/** Stores general information from {@link Command#VER} command */
+	/** Stores general information from {@link Command} */
 	private GeneralInformation generalInformation;
+	/** Stores pdu information from {@link Command} */
+	private Pdu pdu;
+	/** Indicates whether the PDU has a {@link InputType#THREE_PHASE}, used to determine statistic properties */
+	private boolean is3PhasesPdu;
+	/** Stores outlets from {@link Command} */
+	private Outlets outlets;
 
 	public APCPDUCommunicator() {
 		this.localExtendedStatistics = new ExtendedStatistics();
@@ -45,6 +60,8 @@ public class APCPDUCommunicator extends BaseCommunicator implements Monitorable,
 		this.versionProperties = new Properties();
 		this.adapterInitializationTimestamp = System.currentTimeMillis();
 		this.generalInformation = new GeneralInformation();
+		this.pdu = new Pdu();
+		this.outlets = new Outlets();
 	}
 
 	@Override
@@ -55,6 +72,8 @@ public class APCPDUCommunicator extends BaseCommunicator implements Monitorable,
 
 	@Override
 	protected void internalDestroy() {
+		this.outlets = null;
+		this.pdu = null;
 		this.generalInformation = null;
 		this.localExtendedStatistics.getStatistics().clear();
 		this.localExtendedStatistics.getControllableProperties().clear();
@@ -67,13 +86,17 @@ public class APCPDUCommunicator extends BaseCommunicator implements Monitorable,
 		this.reentrantLock.lock();
 		try {
 			this.populateData();
-			var statistics = new HashMap<>(MonitoringHelper.generateGeneral(this.generalInformation));
-			var controllableProperties = new ArrayList<AdvancedControllableProperty>();
-
+			var statistics = new HashMap<>(MonitoringHelper.generateGeneral(this.is3PhasesPdu, this.generalInformation, this.pdu));
 			statistics.putAll(MonitoringHelper.generateAdapterMetadata(this.versionProperties));
+			statistics.putAll(MonitoringHelper.generateConfiguration(this.is3PhasesPdu, this.pdu));
+			statistics.putAll(MonitoringHelper.generateOutlets(this.outlets));
+
+			var controllableProperties = ControllerHelper.generateConfigurationControllers(this.is3PhasesPdu, this.pdu);
+			controllableProperties.addAll(ControllerHelper.generateOutletsControllers(this.outlets));
 
 			this.localExtendedStatistics.setStatistics(statistics);
 			this.localExtendedStatistics.setControllableProperties(controllableProperties);
+			this.localExtendedStatistics.setDynamicStatistics(MonitoringHelper.generateGeneralDynamicProperties(is3PhasesPdu, this.pdu));
 		} finally {
 			this.reentrantLock.unlock();
 		}
@@ -82,12 +105,33 @@ public class APCPDUCommunicator extends BaseCommunicator implements Monitorable,
 
 	@Override
 	public void controlProperty(ControllableProperty controllableProperty) throws Exception {
-
+		this.reentrantLock.lock();
+		try {
+			var property = controllableProperty.getProperty();
+			var value = controllableProperty.getValue();
+			if (property.startsWith(Constant.CONFIGURATION_GROUP)) {
+				this.sendControl(ControllerHelper.generateConfigurationRequest(property, value, this.pdu));
+			} else if (property.contains(Constant.OUTLET_GROUP)) {
+				this.sendControl(ControllerHelper.generateOutletRequest(property, value));
+			} else {
+				this.log.warn("Unsupported property to control: '%s'".formatted(property));
+			}
+		} finally {
+			this.reentrantLock.unlock();
+		}
 	}
 
 	@Override
-	public void controlProperties(List<ControllableProperty> list) throws Exception {
-
+	public void controlProperties(List<ControllableProperty> controllableProperties) throws Exception {
+		if (CollectionUtils.isEmpty(controllableProperties)) {
+			if (this.logger.isWarnEnabled()) {
+				this.logger.warn("ControllableProperties list is null or empty, skipping control operation");
+			}
+			return;
+		}
+		for (ControllableProperty controllableProperty : controllableProperties) {
+			this.controlProperty(controllableProperty);
+		}
 	}
 
 	/**
@@ -111,5 +155,30 @@ public class APCPDUCommunicator extends BaseCommunicator implements Monitorable,
 	 */
 	private void populateData() throws Exception {
 		this.generalInformation = this.send(Command.VER.getRequest(), GeneralInformation.class);
+		this.is3PhasesPdu = InputType.is3Phases(this.generalInformation.getInputType());
+		this.pdu.setPower(this.send(Command.POWER.getRequest(), ResponsePdu.class));
+		this.pdu.setColdStartDelay(this.send(Command.COLD_START_DELAY.getRequest(), ResponsePdu.class));
+		if (InputType.is3Phases(this.generalInformation.getInputType())) {
+			this.pdu.set3PhasesCurrent(this.send(Command.CURRENT.getRequest(), ResponsePdu.class));
+			for (int i = 1; i <= Constant.MAX_PHASE; i++) {
+				this.pdu.setPhaseLowLoadWarning(i, this.send(Command.LOW_LOAD_WARNING.getRequest(i), ResponsePdu.class));
+				this.pdu.setPhaseNearOverloadWarning(i, this.send(Command.NEAR_OVERLOAD_WARNING.getRequest(i), ResponsePdu.class));
+				this.pdu.setPhaseOverloadAlarm(i, this.send(Command.OVERLOAD_ALARM.getRequest(i), ResponsePdu.class));
+				this.pdu.setPhaseOverloadRestriction(i, this.send(Command.OVERLOAD_RESTRICTION.getRequest(i), ResponsePdu.class));
+			}
+		} else {
+			this.pdu.setCurrent(this.send(Command.CURRENT.getRequest(), ResponsePdu.class));
+			this.pdu.setLowLoadWarning(this.send(Command.LOW_LOAD_WARNING.getRequest(), ResponsePdu.class));
+			this.pdu.setNearOverloadWarning(this.send(Command.NEAR_OVERLOAD_WARNING.getRequest(), ResponsePdu.class));
+			this.pdu.setOverloadAlarm(this.send(Command.OVERLOAD_ALARM.getRequest(), ResponsePdu.class));
+			this.pdu.setOverloadRestriction(this.send(Command.OVERLOAD_RESTRICTION.getRequest(), ResponsePdu.class));
+		}
+		this.outlets = this.send(Command.LIST.getRequest(), Outlets.class);
+		if (StringUtils.isNotNullOrEmpty(this.outlets.getOutletNumbers())) {
+			this.outlets.setStatuses(this.send(Command.STATUS.getRequest(this.outlets.getOutletNumbers()), ResponseOutlets.class));
+			this.outlets.setPowerOffDelays(this.send(Command.POWER_OFF_DELAY.getRequest(this.outlets.getOutletNumbers()), ResponseOutlets.class));
+			this.outlets.setPowerOnDelays(this.send(Command.POWER_ON_DELAY.getRequest(this.outlets.getOutletNumbers()), ResponseOutlets.class));
+			this.outlets.setRebootDurations(this.send(Command.REBOOT_DURATION.getRequest(this.outlets.getOutletNumbers()), ResponseOutlets.class));
+		}
 	}
 }
