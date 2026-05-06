@@ -1,10 +1,14 @@
 /** Copyright (c) 2026 AVI-SPL, Inc. All Rights Reserved. */
 package com.avispl.symphony.dal.avdevices.power.apc.pdu.types.properties;
 
+import java.util.Arrays;
+
 import lombok.AccessLevel;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 
+import com.avispl.symphony.api.common.error.InvalidArgumentException;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.common.Constant;
 
 /**
@@ -15,6 +19,7 @@ import com.avispl.symphony.dal.avdevices.power.apc.pdu.common.Constant;
  */
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
+@Getter
 public enum Outlets {
 	NAME("Name"),
 	POWER_OFF_DELAY("PowerOffDelay"),
@@ -25,9 +30,14 @@ public enum Outlets {
 	REBOOT("Reboot"),
 	REBOOT_DURATION_SEC("RebootDuration(sec)");
 
-	String displayName;
+	String property;
 
 	public String getDisplayName(String groupName) {
-		return groupName + Constant.HASH + this.displayName;
+		return groupName + Constant.HASH + this.property;
+	}
+
+	public static Outlets fromProperty(String property) {
+		return Arrays.stream(values()).filter(p -> p.property.equals(property)).findFirst()
+				.orElseThrow(() -> new InvalidArgumentException("Unknown outlet property: '%s'".formatted(property)));
 	}
 }

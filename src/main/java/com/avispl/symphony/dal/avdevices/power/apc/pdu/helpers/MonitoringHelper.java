@@ -4,7 +4,6 @@ package com.avispl.symphony.dal.avdevices.power.apc.pdu.helpers;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Properties;
 
 import lombok.AccessLevel;
@@ -15,7 +14,6 @@ import com.avispl.symphony.dal.avdevices.power.apc.pdu.common.Constant;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.common.Util;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.models.GeneralInformation;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.models.Pdu;
-import com.avispl.symphony.dal.avdevices.power.apc.pdu.models.outlets.Outlet.OutletDetail;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.models.outlets.OutletList;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.types.InputType;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.types.properties.AdapterMetadata;
@@ -150,24 +148,24 @@ public final class MonitoringHelper {
 	 */
 	public static Map<String, String> generateOutlets(OutletList outletList) {
 		var properties = new HashMap<String, String>();
-		outletList.getOutlets().forEach(outlet -> {
+		outletList.getOutletUsers().forEach(outletUser -> {
 			var prefixName = new StringBuilder();
-			prefixName.append(Util.toTitleCase(outlet.getSource())).append("_");
-			prefixName.append(Util.toTitleCase(outlet.getUsername())).append("_");
-			prefixName.append("Outlet_");
-			for (Entry<String, OutletDetail> entry : outlet.getOutletDetails().entrySet()) {
-				var outletDetail = entry.getValue();
+			prefixName.append(Util.toTitleCase(outletUser.getSource())).append(Constant.UNDERSCORE);
+			prefixName.append(Util.toTitleCase(outletUser.getUsername())).append(Constant.UNDERSCORE);
+			prefixName.append(Constant.OUTLET_GROUP);
+			for (var outletNumber : outletUser.getOutletNumbers()) {
+				var outlet = outletList.getOutletDetails().get(outletNumber);
 				for (Outlets property : Outlets.values()) {
-					var propertyName = prefixName + "%02d".formatted(Integer.parseInt(entry.getKey()));
+					var propertyName = prefixName + "%02d".formatted(Integer.parseInt(outletNumber));
 					var propertyValue = switch (property) {
-						case NAME -> outletDetail.getName();
-						case POWER_OFF_DELAY -> outletDetail.isNeverPowerOffDelay() ? "Off" : "On";
-						case POWER_OFF_DELAY_SEC -> outletDetail.getPowerOffDelay();
-						case POWER_ON_DELAY -> outletDetail.isNeverPowerOnDelay() ? "Off" : "On";
-						case POWER_ON_DELAY_SEC -> outletDetail.getPowerOnDelay();
-						case POWER_STATUS -> outletDetail.getPowerStatus().toLowerCase();
+						case NAME -> outlet.getName();
+						case POWER_OFF_DELAY -> outlet.isNeverPowerOffDelay() ? "Off" : "On";
+						case POWER_OFF_DELAY_SEC -> outlet.isNeverPowerOffDelay() ? Constant.MIN_VALUE : outlet.getPowerOffDelay();
+						case POWER_ON_DELAY -> outlet.isNeverPowerOnDelay() ? "Off" : "On";
+						case POWER_ON_DELAY_SEC -> outlet.isNeverPowerOnDelay() ? Constant.MIN_VALUE : outlet.getPowerOnDelay();
+						case POWER_STATUS -> outlet.getPowerStatus().toLowerCase();
 						case REBOOT -> Constant.NOT_AVAILABLE;
-						case REBOOT_DURATION_SEC -> outletDetail.getRebootDuration();
+						case REBOOT_DURATION_SEC -> outlet.getRebootDuration();
 					};
 					properties.put(property.getDisplayName(propertyName), Util.mapToValue(propertyValue));
 				}

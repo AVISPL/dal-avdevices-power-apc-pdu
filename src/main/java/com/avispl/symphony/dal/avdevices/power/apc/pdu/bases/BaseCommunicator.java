@@ -72,10 +72,10 @@ public abstract class BaseCommunicator extends SshCommunicator {
 			if (response == null || response.trim().isEmpty()) {
 				throw new CommandFailureException(this.host, request, response, 502);
 			}
+			var normalizeResponse = this.normalizeResponse(response, request);
 			if (Constant.ERROR_RESPONSE_PATTERN.matcher(response).find()) {
 				throw new CommandFailureException(this.host, request, response, 400);
 			}
-			var normalizeResponse = this.normalizeResponse(response, request);
 			var instance = clazz.getDeclaredConstructor().newInstance();
 			instance.parse(normalizeResponse);
 
@@ -104,13 +104,14 @@ public abstract class BaseCommunicator extends SshCommunicator {
 			if (response == null || response.trim().isEmpty()) {
 				throw new CommandFailureException(this.host, request, response, 502);
 			}
-			if (Constant.ERROR_RESPONSE_PATTERN.matcher(response).find()) {
+			var normalizeResponse = this.normalizeResponse(response, request);
+			if (Constant.ERROR_RESPONSE_PATTERN.matcher(normalizeResponse).find()) {
 				throw new CommandFailureException(this.host, request, response, 400);
 			}
 		} catch (SocketTimeoutException | FailedLoginException e) {
 			throw e;
 		} catch (Exception e) {
-			throw new ResourceNotReachableException("Failed to send command %s".formatted(request), e);
+			throw new IllegalStateException("Failed to send control command '%s'".formatted(request), e);
 		}
 	}
 

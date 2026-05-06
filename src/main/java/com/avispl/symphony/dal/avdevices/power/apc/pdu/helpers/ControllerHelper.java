@@ -3,7 +3,6 @@ package com.avispl.symphony.dal.avdevices.power.apc.pdu.helpers;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map.Entry;
 
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -14,7 +13,6 @@ import com.avispl.symphony.dal.avdevices.power.apc.pdu.common.Constant;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.common.Logger;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.common.Util;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.models.Pdu;
-import com.avispl.symphony.dal.avdevices.power.apc.pdu.models.outlets.Outlet.OutletDetail;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.models.outlets.OutletList;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.types.Command;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.types.properties.Configuration;
@@ -121,27 +119,56 @@ public final class ControllerHelper {
 	 */
 	public static List<AdvancedControllableProperty> generateOutletsControllers(OutletList outletList) {
 		var controllableProperties = new ArrayList<AdvancedControllableProperty>();
-		outletList.getOutlets().forEach(outlet -> {
+		outletList.getOutletUsers().forEach(outletUser -> {
 			var prefixName = new StringBuilder();
-			prefixName.append(Util.toTitleCase(outlet.getSource())).append("_");
-			prefixName.append(Util.toTitleCase(outlet.getUsername())).append("_");
-			prefixName.append("Outlet_");
-			for (Entry<String, OutletDetail> entry : outlet.getOutletDetails().entrySet()) {
-				var propertyName = prefixName + "%02d".formatted(Integer.parseInt(entry.getKey()));
-				var outletDetail = entry.getValue();
+			prefixName.append(Util.toTitleCase(outletUser.getSource())).append(Constant.UNDERSCORE);
+			prefixName.append(Util.toTitleCase(outletUser.getUsername())).append(Constant.UNDERSCORE);
+			prefixName.append(Constant.OUTLET_GROUP);
+			for (var outletNumber : outletUser.getOutletNumbers()) {
+				var propertyName = prefixName + "%02d".formatted(Integer.parseInt(outletNumber));
+				var outlet = outletList.getOutletDetails().get(outletNumber);
 				controllableProperties.addAll(List.of(
-						ControllablePropertyFactory.createSwitch(Outlets.POWER_OFF_DELAY.getDisplayName(propertyName), outletDetail.isNeverPowerOffDelay() ? 0 : 1),
-						ControllablePropertyFactory.createNumeric(Outlets.POWER_OFF_DELAY_SEC.getDisplayName(propertyName), outletDetail.getPowerOffDelay()),
-						ControllablePropertyFactory.createSwitch(Outlets.POWER_ON_DELAY.getDisplayName(propertyName), outletDetail.isNeverPowerOnDelay() ? 0 : 1),
-						ControllablePropertyFactory.createNumeric(Outlets.POWER_ON_DELAY_SEC.getDisplayName(propertyName), outletDetail.getPowerOnDelay()),
-						ControllablePropertyFactory.createSwitch(Outlets.POWER_STATUS.getDisplayName(propertyName), mapToSwitchValue(outletDetail.getPowerStatus())),
+						ControllablePropertyFactory.createSwitch(Outlets.POWER_OFF_DELAY.getDisplayName(propertyName), outlet.isNeverPowerOffDelay() ? 0 : 1),
+						ControllablePropertyFactory.createSwitch(Outlets.POWER_ON_DELAY.getDisplayName(propertyName), outlet.isNeverPowerOnDelay() ? 0 : 1),
+						ControllablePropertyFactory.createSwitch(Outlets.POWER_STATUS.getDisplayName(propertyName), mapToSwitchValue(outlet.getPowerStatus())),
 						ControllablePropertyFactory.createButton(Outlets.REBOOT.getDisplayName(propertyName), "Reboot", "Rebooting", 0L),
-						ControllablePropertyFactory.createNumeric(Outlets.REBOOT_DURATION_SEC.getDisplayName(propertyName), outletDetail.getRebootDuration())
+						ControllablePropertyFactory.createNumeric(Outlets.REBOOT_DURATION_SEC.getDisplayName(propertyName), outlet.getRebootDuration())
 				));
+				if (!outlet.isNeverPowerOffDelay()) {
+					controllableProperties.add(ControllablePropertyFactory.createNumeric(Outlets.POWER_OFF_DELAY_SEC.getDisplayName(propertyName), outlet.getPowerOffDelay()));
+				}
+				if (!outlet.isNeverPowerOnDelay()) {
+					controllableProperties.add(ControllablePropertyFactory.createNumeric(Outlets.POWER_ON_DELAY_SEC.getDisplayName(propertyName), outlet.getPowerOnDelay()));
+				}
 			}
 		});
 
 		return controllableProperties;
+	}
+
+	/**
+	 * Generates a request command for an outlet property.
+	 *
+	 * @param property the outlet property identifier
+	 * @param value the value associated with the property
+	 * @return the generated request command
+	 * @throws InvalidArgumentException if the outlet property is unsupported
+	 */
+	public static String generateOutletRequest(String property, Object value) {
+		var propertyComponent = property.split(Constant.HASH);
+		var nameComponent = propertyComponent[0].split(Constant.UNDERSCORE);
+		var outletNumber = Integer.parseInt(nameComponent[nameComponent.length - 1]);
+		var outletProperty = Outlets.fromProperty(propertyComponent[1]);
+		var param = buildOutletParam(outletNumber, outletProperty, value.toString());
+
+		return switch (outletProperty) {
+			case POWER_OFF_DELAY, POWER_OFF_DELAY_SEC -> Command.POWER_OFF_DELAY.getRequest(param);
+			case POWER_ON_DELAY, POWER_ON_DELAY_SEC -> Command.POWER_ON_DELAY.getRequest(param);
+			case POWER_STATUS -> "1".equals(value.toString()) ? Command.ON.getRequest(outletNumber) : Command.OFF.getRequest(outletNumber);
+			case REBOOT -> Command.REBOOT.getRequest(outletNumber);
+			case REBOOT_DURATION_SEC -> Command.REBOOT_DURATION.getRequest(param);
+			default -> throw new InvalidArgumentException("Unknown outlet property: '%s'".formatted(property));
+		};
 	}
 
 	/**
@@ -178,6 +205,22 @@ public final class ControllerHelper {
 			return phase + " " + mapToStatusValue(value);
 		}
 		return phase + " " + value;
+	}
+
+	/**
+	 * Builds the request parameter for outlet commands.
+	 *
+	 * @param outletNumber the outlet number
+	 * @param property the outlet property
+	 * @param value the property value
+	 * @return the formatted outlet request parameter
+	 */
+	private static String buildOutletParam(int outletNumber, Outlets property, String value) {
+		if (Outlets.POWER_OFF_DELAY.equals(property) || Outlets.POWER_ON_DELAY.equals(property)) {
+			return outletNumber + " " + ("1".equals(value) ? Constant.MIN_VALUE : Constant.NEVER);
+		}
+
+		return outletNumber + " " + value;
 	}
 
 	private static int mapToSwitchValue(String input) {

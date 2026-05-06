@@ -27,7 +27,10 @@ public enum Command {
 	STATUS("status"),
 	POWER_OFF_DELAY("poweroffdelay"),
 	POWER_ON_DELAY("powerondelay"),
-	REBOOT_DURATION("rebootduration");
+	REBOOT("reboot"),
+	REBOOT_DURATION("rebootduration"),
+	ON("on"),
+	OFF("off");
 
 	String request;
 
