@@ -7,7 +7,6 @@ import java.util.regex.Matcher;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
-import com.avispl.symphony.dal.avdevices.power.apc.pdu.models.outlets.OutletUser;
 import com.avispl.symphony.dal.util.StringUtils;
 
 /**
@@ -232,10 +231,18 @@ public final class Util {
 		}
 	}
 
-	public static String buildOutletPropertyPrefix(OutletUser outletUser) {
-		return toTitleCase(outletUser.getSource()) + Constant.UNDERSCORE
-				+ toTitleCase(outletUser.getUsername()) + Constant.UNDERSCORE
-				+ Constant.OUTLET_GROUP;
+	/**
+	 * Builds the property-group prefix for a physical outlet, e.g. {@code Outlet_01}.
+	 *
+	 * <p>Outlets are identified by their number alone. They were previously prefixed with the account they are
+	 * assigned to, which produced one duplicate group per account with access - the same outlet reported repeatedly
+	 * with identical values, and controllable regardless of whether that account was even enabled.
+	 *
+	 * @param outletNumber the outlet number as reported by the device
+	 * @return the property-group prefix, zero-padded to two digits
+	 */
+	public static String buildOutletPropertyPrefix(String outletNumber) {
+		return Constant.OUTLET_GROUP + "%02d".formatted(Integer.parseInt(outletNumber));
 	}
 
 	/**

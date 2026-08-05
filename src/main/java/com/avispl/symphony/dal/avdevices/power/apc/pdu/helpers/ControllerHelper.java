@@ -120,26 +120,23 @@ public final class ControllerHelper {
 	 */
 	public static List<AdvancedControllableProperty> generateOutletsControllers(Outlets outlets) {
 		var controllableProperties = new ArrayList<AdvancedControllableProperty>();
-		outlets.getOutletUsers().forEach(outletUser -> {
-			var prefixName = Util.buildOutletPropertyPrefix(outletUser);
-			for (var outletNumber : outletUser.getOutletNumbers()) {
-				var propertyName = prefixName + "%02d".formatted(Integer.parseInt(outletNumber));
-				var outlet = outlets.getOutletDetails().get(outletNumber);
-				controllableProperties.addAll(List.of(
-						ControllablePropertyFactory.createSwitch(Outlet.POWER_OFF_DELAY.getDisplayName(propertyName), outlet.isPowerOffDelayDisabled() ? 0 : 1),
-						ControllablePropertyFactory.createSwitch(Outlet.POWER_ON_DELAY.getDisplayName(propertyName), outlet.isPowerOnDelayDisabled() ? 0 : 1),
-						ControllablePropertyFactory.createSwitch(Outlet.POWER_STATUS.getDisplayName(propertyName), mapToSwitchValue(outlet.getPowerStatus())),
-						ControllablePropertyFactory.createButton(Outlet.REBOOT.getDisplayName(propertyName), "Reboot", "Rebooting", 0L),
-						ControllablePropertyFactory.createNumeric(Outlet.REBOOT_DURATION_SEC.getDisplayName(propertyName), outlet.getRebootDuration())
-				));
-				if (!outlet.isPowerOffDelayDisabled()) {
-					controllableProperties.add(ControllablePropertyFactory.createNumeric(Outlet.POWER_OFF_DELAY_SEC.getDisplayName(propertyName), outlet.getPowerOffDelay()));
-				}
-				if (!outlet.isPowerOnDelayDisabled()) {
-					controllableProperties.add(ControllablePropertyFactory.createNumeric(Outlet.POWER_ON_DELAY_SEC.getDisplayName(propertyName), outlet.getPowerOnDelay()));
-				}
+		for (var outletNumber : outlets.getOrderedOutletNumbers()) {
+			var propertyName = Util.buildOutletPropertyPrefix(outletNumber);
+			var outlet = outlets.getOutletDetails().get(outletNumber);
+			controllableProperties.addAll(List.of(
+					ControllablePropertyFactory.createSwitch(Outlet.POWER_OFF_DELAY.getDisplayName(propertyName), outlet.isPowerOffDelayDisabled() ? 0 : 1),
+					ControllablePropertyFactory.createSwitch(Outlet.POWER_ON_DELAY.getDisplayName(propertyName), outlet.isPowerOnDelayDisabled() ? 0 : 1),
+					ControllablePropertyFactory.createSwitch(Outlet.POWER_STATUS.getDisplayName(propertyName), mapToSwitchValue(outlet.getPowerStatus())),
+					ControllablePropertyFactory.createButton(Outlet.REBOOT.getDisplayName(propertyName), "Reboot", "Rebooting", 0L),
+					ControllablePropertyFactory.createNumeric(Outlet.REBOOT_DURATION_SEC.getDisplayName(propertyName), outlet.getRebootDuration())
+			));
+			if (!outlet.isPowerOffDelayDisabled()) {
+				controllableProperties.add(ControllablePropertyFactory.createNumeric(Outlet.POWER_OFF_DELAY_SEC.getDisplayName(propertyName), outlet.getPowerOffDelay()));
 			}
-		});
+			if (!outlet.isPowerOnDelayDisabled()) {
+				controllableProperties.add(ControllablePropertyFactory.createNumeric(Outlet.POWER_ON_DELAY_SEC.getDisplayName(propertyName), outlet.getPowerOnDelay()));
+			}
+		}
 
 		return controllableProperties;
 	}

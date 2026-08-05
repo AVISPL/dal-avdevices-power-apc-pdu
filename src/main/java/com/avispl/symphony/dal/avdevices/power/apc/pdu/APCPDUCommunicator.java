@@ -241,7 +241,7 @@ public class APCPDUCommunicator extends BaseCommunicator implements Monitorable,
 			this.pdu.setOverloadRestriction(this.readRestriction(1));
 		}
 		this.outlets = new Outlets();
-		this.outlets.setUsers(this.send(Command.LIST.requestFor(this.generation), ResponseOutlets.class));
+		this.outlets.initialize(this.generalInformation.getOutlets());
 		if (StringUtils.isNotNullOrEmpty(this.outlets.getOutletNumbers())) {
 			this.outlets.setStatuses(this.readAllOutlets(Command.STATUS), this.generation);
 			this.outlets.setPowerOffDelays(this.readAllOutlets(Command.POWER_OFF_DELAY));
@@ -309,7 +309,8 @@ public class APCPDUCommunicator extends BaseCommunicator implements Monitorable,
 			this.pdu.setOverloadAlarm(this.send(Command.OVERLOAD_ALARM.getRequest(), ResponsePdu.class));
 			this.pdu.setOverloadRestriction(this.send(Command.OVERLOAD_RESTRICTION.getRequest(), ResponsePdu.class));
 		}
-		this.outlets = this.send(Command.LIST.getRequest(), Outlets.class);
+		this.outlets = new Outlets();
+		this.outlets.initialize(this.generalInformation.getOutlets());
 		if (StringUtils.isNotNullOrEmpty(this.outlets.getOutletNumbers())) {
 			this.outlets.setStatuses(this.send(Command.STATUS.getRequest(this.outlets.getOutletNumbers()), ResponseOutlets.class), this.generation);
 			this.outlets.setPowerOffDelays(this.send(Command.POWER_OFF_DELAY.getRequest(this.outlets.getOutletNumbers()), ResponseOutlets.class));

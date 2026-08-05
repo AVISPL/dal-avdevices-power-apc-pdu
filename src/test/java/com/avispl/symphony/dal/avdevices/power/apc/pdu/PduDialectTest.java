@@ -1,6 +1,8 @@
 /** Copyright (c) 2026 AVI-SPL, Inc. All Rights Reserved. */
 package com.avispl.symphony.dal.avdevices.power.apc.pdu;
 
+import java.util.List;
+
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -251,47 +253,45 @@ class PduDialectTest {
 		}
 
 		@Test
-		@DisplayName("1st generation `list` keeps its source and comma-separated outlets")
-		void parsesRpduUserList() {
+		@DisplayName("outlets are enumerated from the device's outlet count, one group per physical outlet")
+		void enumeratesFromOutletCount() {
 			var outlets = new Outlets();
-			outlets.parse("Local: apc: 1,2,3,4,5,6,7,8\nLocal: carlos_sanchez: 1,3");
+			outlets.initialize("8");
 
-			Assertions.assertEquals(2, outlets.getOutletUsers().size());
-			Assertions.assertEquals("Local", outlets.getOutletUsers().get(0).getSource());
-			Assertions.assertEquals("apc", outlets.getOutletUsers().get(0).getUsername());
-			Assertions.assertEquals(2, outlets.getOutletUsers().get(1).getOutletNumbers().size());
+			// 8 outlets, not one group per account with access to them.
+			Assertions.assertEquals(8, outlets.getOutletDetails().size());
+			Assertions.assertEquals("1,2,3,4,5,6,7,8", outlets.getOutletNumbers());
+			Assertions.assertEquals(List.of("1", "2", "3", "4", "5", "6", "7", "8"), outlets.getOrderedOutletNumbers());
 		}
 
 		@Test
-		@DisplayName("2nd generation `userList` is a fixed-width table with outlet ranges")
-		void parsesRpdu2gUserList() {
+		@DisplayName("outlet numbers are ordered numerically, not lexicographically")
+		void ordersOutletsNumerically() {
 			var outlets = new Outlets();
-			outlets.setUsers(response("""
-					Name                 User Type            Status    Outlets
-					----                 ---------            ------    -------
-					apc                  Super                ******    1-8
-					device               Device               Disabled  1-8
-					readonly             ReadOnly             Disabled  1-8
-					"""));
+			outlets.initialize("12");
 
-			Assertions.assertEquals(3, outlets.getOutletUsers().size());
-			var first = outlets.getOutletUsers().get(0);
-			Assertions.assertEquals("apc", first.getUsername());
-			// Source is synthesised so property names match 1st generation exactly.
-			Assertions.assertEquals("Local", first.getSource());
-			// The range must be expanded, otherwise a single "1-8" outlet would be reported.
-			Assertions.assertEquals(8, first.getOutletNumbers().size());
-			Assertions.assertTrue(first.getOutletNumbers().containsAll(java.util.Set.of("1", "4", "8")));
+			Assertions.assertEquals("9", outlets.getOrderedOutletNumbers().get(8));
+			Assertions.assertEquals("12", outlets.getOrderedOutletNumbers().get(11));
 		}
 
 		@Test
-		void expandsMixedRangesAndSkipsGarbage() {
-			var outlets = new Outlets();
-			outlets.setUsers(response("mixed  Super  ok  1-3,6\nbroken  Super  ok  x-y"));
+		void toleratesAnAbsentOrUnparseableCount() {
+			var absent = new Outlets();
+			absent.initialize(null);
+			Assertions.assertTrue(absent.getOutletDetails().isEmpty());
+			Assertions.assertEquals("", absent.getOutletNumbers());
 
-			Assertions.assertEquals(1, outlets.getOutletUsers().size());
-			Assertions.assertEquals(4, outlets.getOutletUsers().get(0).getOutletNumbers().size());
-			Assertions.assertEquals("1,2,3,6", outlets.getOutletNumbers());
+			var garbage = new Outlets();
+			garbage.initialize("N/A");
+			Assertions.assertTrue(garbage.getOutletDetails().isEmpty());
+		}
+
+		@Test
+		@DisplayName("property names are per outlet, with no account prefix")
+		void namesPropertiesByOutletAlone() {
+			Assertions.assertEquals("Outlet_01", Util.buildOutletPropertyPrefix("1"));
+			Assertions.assertEquals("Outlet_08", Util.buildOutletPropertyPrefix("8"));
+			Assertions.assertEquals("Outlet_12", Util.buildOutletPropertyPrefix("12"));
 		}
 	}
 

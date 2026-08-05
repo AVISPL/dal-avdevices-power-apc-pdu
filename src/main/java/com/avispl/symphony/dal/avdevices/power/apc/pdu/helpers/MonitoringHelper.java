@@ -148,26 +148,25 @@ public final class MonitoringHelper {
 	 */
 	public static Map<String, String> generateOutlets(Outlets outlets) {
 		var properties = new HashMap<String, String>();
-		outlets.getOutletUsers().forEach(outletUser -> {
-			var prefixName = Util.buildOutletPropertyPrefix(outletUser);
-			for (var outletNumber : outletUser.getOutletNumbers()) {
-				var outlet = outlets.getOutletDetails().get(outletNumber);
-				for (Outlet property : Outlet.values()) {
-					var propertyName = prefixName + "%02d".formatted(Integer.parseInt(outletNumber));
-					var propertyValue = switch (property) {
-						case NAME -> outlet.getName();
-						case POWER_OFF_DELAY -> outlet.isPowerOffDelayDisabled() ? "Off" : "On";
-						case POWER_OFF_DELAY_SEC -> outlet.isPowerOffDelayDisabled() ? Constant.MIN_VALUE : outlet.getPowerOffDelay();
-						case POWER_ON_DELAY -> outlet.isPowerOnDelayDisabled() ? "Off" : "On";
-						case POWER_ON_DELAY_SEC -> outlet.isPowerOnDelayDisabled() ? Constant.MIN_VALUE : outlet.getPowerOnDelay();
-						case POWER_STATUS -> outlet.getPowerStatus().toLowerCase();
-						case REBOOT -> Constant.NOT_AVAILABLE;
-						case REBOOT_DURATION_SEC -> outlet.getRebootDuration();
-					};
-					properties.put(property.getDisplayName(propertyName), Util.mapToValue(propertyValue));
-				}
+		for (var outletNumber : outlets.getOrderedOutletNumbers()) {
+			var outlet = outlets.getOutletDetails().get(outletNumber);
+			var propertyName = Util.buildOutletPropertyPrefix(outletNumber);
+			for (Outlet property : Outlet.values()) {
+				var propertyValue = switch (property) {
+					case NAME -> outlet.getName();
+					case POWER_OFF_DELAY -> outlet.isPowerOffDelayDisabled() ? "Off" : "On";
+					case POWER_OFF_DELAY_SEC -> outlet.isPowerOffDelayDisabled() ? Constant.MIN_VALUE : outlet.getPowerOffDelay();
+					case POWER_ON_DELAY -> outlet.isPowerOnDelayDisabled() ? "Off" : "On";
+					case POWER_ON_DELAY_SEC -> outlet.isPowerOnDelayDisabled() ? Constant.MIN_VALUE : outlet.getPowerOnDelay();
+					// Lower-cased so that `rpdu` ("ON") and `rpdu2g` ("On") both render identically after title-casing.
+					case POWER_STATUS -> outlet.getPowerStatus() == null ? null : outlet.getPowerStatus().toLowerCase();
+					case REBOOT -> Constant.NOT_AVAILABLE;
+					case REBOOT_DURATION_SEC -> outlet.getRebootDuration();
+				};
+				properties.put(property.getDisplayName(propertyName), Util.mapToValue(propertyValue));
 			}
-		});
+		}
+
 		return properties;
 	}
 
