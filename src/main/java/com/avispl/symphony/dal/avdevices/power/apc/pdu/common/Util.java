@@ -238,6 +238,25 @@ public final class Util {
 				+ Constant.OUTLET_GROUP;
 	}
 
+	/**
+	 * Normalizes a 2nd generation {@code phRestrictn} reading onto the on/off token 1st generation reports, so that the
+	 * resulting Symphony property carries the same value on both generations.
+	 *
+	 * <p>{@code rpdu} answers {@code Overload restriction is off for 1.} whereas {@code rpdu2g} answers prose such as
+	 * {@code 1: Always Allow Turn On}. Only the "always allow" wording means unrestricted; every other wording denotes
+	 * some restriction being in effect, which avoids having to enumerate the {@code near} and {@code over} phrasings.
+	 *
+	 * @param input the raw reading
+	 * @return {@code "off"} when unrestricted, {@code "on"} when restricted, or {@code null} when the input is unusable
+	 */
+	public static String toRestrictionState(String input) {
+		if (StringUtils.isNullOrEmpty(input, true)) {
+			LOG.warn("Skip restriction mapping: the input is null or empty");
+			return null;
+		}
+		return input.toLowerCase().contains(Constant.RESTRICTION_DISABLED_2G) ? "off" : Constant.ON;
+	}
+
 	public static String mapToStatusValue(String input) {
 		try {
 			return "1".equals(input) ? "on" : "off";

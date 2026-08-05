@@ -3,8 +3,8 @@ package com.avispl.symphony.dal.avdevices.power.apc.pdu.bases;
 
 import java.net.SocketTimeoutException;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.regex.Pattern;
 
 import javax.security.auth.login.FailedLoginException;
 
@@ -34,7 +34,14 @@ public abstract class BaseCommunicator extends SshCommunicator {
 
 	@Override
 	protected void internalInit() throws Exception {
-		super.setCommandSuccessList(List.of(Constant.PROMPT_COMMAND, "Bye."));
+		// Terminators must cover both firmware generations: they are fixed before any I/O happens, so the
+		// generation is not yet known here. ShellCommunicator#doneReading matches with case-sensitive
+		// String#endsWith, hence both prompt spellings have to be listed explicitly.
+		super.setCommandSuccessList(List.of(Constant.PROMPT_COMMAND, Constant.PROMPT_COMMAND_2G, "Bye."));
+		// Only 1st generation message text is enumerated here. This list is an early-exit optimisation for the read
+		// loop, not the error classifier - the prompt above terminates the read on either generation and
+		// ERROR_RESPONSE_PATTERN does the actual classification. 2nd generation messages are deliberately omitted
+		// because endsWith cannot match on a code prefix and its message text differs per command.
 		super.setCommandErrorList(List.of(
 				"E100: Command does not exist.",
 				"E101: Invalid command arguments.",
@@ -43,7 +50,7 @@ public abstract class BaseCommunicator extends SshCommunicator {
 				"E104: User does not have access to this command.",
 				"E200: Input error."
 		));
-		super.setLoginSuccessList(List.of(Constant.PROMPT_COMMAND));
+		super.setLoginSuccessList(List.of(Constant.PROMPT_COMMAND, Constant.PROMPT_COMMAND_2G));
 		super.setLoginErrorList(List.of("Login failed."));
 		super.internalInit();
 	}
@@ -106,13 +113,57 @@ public abstract class BaseCommunicator extends SshCommunicator {
 			}
 			var normalizeResponse = this.normalizeResponse(response, request);
 			if (Constant.ERROR_RESPONSE_PATTERN.matcher(normalizeResponse).find()) {
-				throw new CommandFailureException(this.host, request, response, 400);
+				throw new CommandFailureException(this.host, request, normalizeResponse, 400);
 			}
 		} catch (SocketTimeoutException | FailedLoginException e) {
 			throw e;
+		} catch (CommandFailureException e) {
+			// Surface the device's own status line. A control can be rejected because the value is not in the
+			// command's grammar on this firmware generation - for example disabling an outlet delay writes `never`,
+			// which `rpdu` documents but `rpdu2g` does not list for olOnDelay/olOffDelay. Failing with the device's
+			// message is deliberate: silently substituting a numeric delay would report the control as disabled
+			// while the device kept it enabled.
+			throw new IllegalStateException("Device rejected control command '%s': %s"
+					.formatted(request, describeFailure(e.getResponse())), e);
 		} catch (Exception e) {
 			throw new IllegalStateException("Failed to send control command '%s'".formatted(request), e);
 		}
+	}
+
+	/** Reduces a rejection response to its status line, discarding any usage block the device appended. */
+	private static String describeFailure(String response) {
+		if (response == null || response.isBlank()) {
+			return "no response";
+		}
+		return response.lines()
+				.map(String::trim)
+				.filter(line -> !line.isEmpty())
+				.findFirst()
+				.orElse("no response");
+	}
+
+	/**
+	 * Sends a command and returns its normalized response only if the device accepted it.
+	 *
+	 * <p>Unlike {@link #send(String, Class)} this does not throw when the device rejects the command, which makes it
+	 * usable for probing whether a verb exists on the connected firmware generation.
+	 *
+	 * @param request command string to send
+	 * @return the normalized response, or {@link Optional#empty()} if the response was blank or carried an error code
+	 * @throws SocketTimeoutException if the request times out
+	 * @throws FailedLoginException if authentication fails
+	 */
+	protected Optional<String> trySend(String request) throws Exception {
+		var response = super.send(request);
+		if (response == null || response.trim().isEmpty()) {
+			return Optional.empty();
+		}
+		var normalizeResponse = this.normalizeResponse(response, request);
+		if (Constant.ERROR_RESPONSE_PATTERN.matcher(normalizeResponse).find()) {
+			this.log.debug("Device rejected probe command '%s'".formatted(request));
+			return Optional.empty();
+		}
+		return Optional.of(normalizeResponse);
 	}
 
 	/**
@@ -129,12 +180,13 @@ public abstract class BaseCommunicator extends SshCommunicator {
 		if (response.startsWith(request)) {
 			response = response.substring(request.length());
 		}
-		// normalize line break + remove prompt
+		// normalize line break + remove prompt (either generation's spelling)
 		response = response.replace("\r\n", "\n")
-				.replace("\r", "\n")
-				.replaceFirst(Pattern.quote(Constant.PROMPT_COMMAND) + "\\s*$", Constant.EMPTY);
-		// remove response status
-		response = response.replaceFirst("OK", Constant.EMPTY).trim();
+				.replace("\r", "\n");
+		response = Constant.PROMPT_PATTERN.matcher(response).replaceFirst(Constant.EMPTY);
+		// remove response status - `OK` on 1st generation, `E000: Success` on 2nd. Anchored to a whole line so that
+		// an outlet named e.g. "OK-rack" is not mangled.
+		response = Constant.SUCCESS_MARKER_PATTERN.matcher(response).replaceFirst(Constant.EMPTY).trim();
 
 		return response;
 	}

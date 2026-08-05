@@ -169,6 +169,13 @@
       <version>5.7.0-M1</version>
       <scope>test</scope>
     </dependency>
+    <!-- Without the Jupiter engine only the API is on the test classpath, so surefire discovers no JUnit 5 tests -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-engine</artifactId>
+      <version>5.7.0-M1</version>
+      <scope>test</scope>
+    </dependency>
     <dependency>
       <groupId>org.junit.vintage</groupId>
       <artifactId>junit-vintage-engine</artifactId>

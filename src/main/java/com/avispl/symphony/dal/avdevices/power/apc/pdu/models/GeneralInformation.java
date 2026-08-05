@@ -10,6 +10,8 @@ import lombok.NoArgsConstructor;
 import lombok.experimental.FieldDefaults;
 
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.bases.BaseModel;
+import com.avispl.symphony.dal.avdevices.power.apc.pdu.common.Constant;
+import com.avispl.symphony.dal.avdevices.power.apc.pdu.types.InputType;
 
 /**
  * Represents general device information parsed from command response.
@@ -44,6 +46,47 @@ public class GeneralInformation extends BaseModel {
 			"Max Current:", v -> this.maxLoad = v,
 			"Input Type:", v -> this.inputType = v
 	);
+
+	/**
+	 * Builds general information from a 2nd generation {@code prodInfo} response.
+	 *
+	 * <p>Populates exactly the same fields 1st generation {@code ver} does, so that the resulting Symphony property
+	 * set is identical across generations. {@code Input Type} has no direct counterpart and is derived from
+	 * {@code Present Phases}, which is the value {@link InputType#is3Phases(String)} needs.
+	 *
+	 * @param product the parsed {@code prodInfo} response (must not be {@code null})
+	 * @return general information carrying the same fields as the 1st generation equivalent
+	 */
+	public static GeneralInformation ofProductInformation(ProductInformation product) {
+		var general = new GeneralInformation();
+		general.aosVersion = product.get(ProductInformation.KEY_AOS);
+		general.pduVersion = product.get(ProductInformation.KEY_PDU);
+		general.model = product.get(ProductInformation.KEY_MODEL);
+		general.outlets = product.get(ProductInformation.KEY_PRESENT_OUTLETS);
+		general.maxLoad = product.get(ProductInformation.KEY_MAX_CURRENT);
+		general.inputType = toInputType(product.get(ProductInformation.KEY_PRESENT_PHASES));
+
+		return general;
+	}
+
+	/**
+	 * Maps a 2nd generation phase count onto the 1st generation {@code Input Type} vocabulary.
+	 *
+	 * <p>{@code prodInfo} reports a count, whereas {@code ver} reports {@code single-phase} / {@code banked} /
+	 * {@code 3-phase}. A count of 3 is the only value that changes adapter behaviour; anything else is reported as
+	 * single-phase, since the count alone cannot distinguish single from banked.
+	 *
+	 * @param presentPhases the reported phase count; may be {@code null}
+	 * @return the matching {@code Input Type} value, or {@code null} when the count is absent
+	 */
+	private static String toInputType(String presentPhases) {
+		if (presentPhases == null || presentPhases.isBlank()) {
+			return null;
+		}
+		return String.valueOf(Constant.MAX_PHASE).equals(presentPhases.trim())
+				? InputType.THREE_PHASE.getValue()
+				: InputType.SINGLE_PHASE.getValue();
+	}
 
 	/**
 	 * Parses raw CLI response text and maps extracted values to this {@code GeneralInformation} object.
