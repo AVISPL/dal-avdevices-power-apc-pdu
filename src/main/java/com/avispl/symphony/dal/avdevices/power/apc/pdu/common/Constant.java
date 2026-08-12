@@ -43,6 +43,7 @@ public final class Constant {
 	/** Leading success marker - {@code OK} on 1st generation, {@code E000: Success} on 2nd generation. */
 	public static final Pattern SUCCESS_MARKER_PATTERN = Pattern.compile("(?m)^[ \\t]*(?:OK|E000:[ \\t]*Success)[ \\t]*\\R?");
 	public static final Pattern VALUE_WITH_UNIT_PATTERN = Pattern.compile("(\\d+(?:\\.\\d+)?)\\s*(A|VA|W)");
+    public static final Pattern NEVER_PATTERN = Pattern.compile("(?i)never");
 	/** {@code rpdu} spells the unit out ("is 5 seconds."), {@code rpdu2g} abbreviates it ("5 sec"). */
 	public static final Pattern TIME_SECONDS_PATTERN = Pattern.compile("(\\d+)\\s*sec(?:onds?)?\\b");
 	public static final Pattern OVERLOAD_SETTING_PATTERN = Pattern.compile("Overload restriction is (\\S+)");

@@ -78,11 +78,28 @@ public class Pdu {
 	}
 
 	public void setLowLoadWarning(ResponsePdu lowLoadWarning) {
-		this.lowLoadWarning = Optional.ofNullable(lowLoadWarning).map(ResponsePdu::getValue).orElse(null);
+		this.lowLoadWarning = toThreshold(lowLoadWarning);
 	}
 
 	public void setNearOverloadWarning(ResponsePdu nearOverloadWarning) {
-		this.nearOverloadWarning = Optional.ofNullable(nearOverloadWarning).map(ResponsePdu::getValue).orElse(null);
+		this.nearOverloadWarning = toThreshold(nearOverloadWarning);
+	}
+
+	/**
+	 * Reads a load threshold as a decimal.
+	 *
+	 * <p>Re-extracts from the unparsed response rather than reusing {@link ResponsePdu#getValue()}, which is rounded to a
+	 * whole number. The low-load, near-overload and overload-alarm thresholds are reported as doubles, so a device
+	 * answering {@code 10 A} must surface as {@code 10.0} and a fractional reading must not be rounded away.
+	 *
+	 * @param response the threshold response; may be {@code null}
+	 * @return the threshold as a decimal string, or {@code null} when it cannot be read
+	 */
+	private static String toThreshold(ResponsePdu response) {
+		return Optional.ofNullable(response)
+				.map(ResponsePdu::getRaw)
+				.flatMap(Util::extractDecimalValue)
+				.orElse(null);
 	}
 
 	public void setOverloadRestriction(ResponsePdu overloadRestriction) {
@@ -100,7 +117,7 @@ public class Pdu {
 	}
 
 	public void setOverloadAlarm(ResponsePdu overloadAlarm) {
-		this.overloadAlarm = Optional.ofNullable(overloadAlarm).map(ResponsePdu::getValue).orElse(null);
+		this.overloadAlarm = toThreshold(overloadAlarm);
 	}
 
 	public void set3PhasesCurrent(ResponsePdu threePhasesCurrent) {
@@ -112,13 +129,11 @@ public class Pdu {
 	}
 
 	public void setPhaseLowLoadWarning(int phase, ResponsePdu lowLoadWarning) {
-		var value = Optional.ofNullable(lowLoadWarning).map(ResponsePdu::getValue).orElse(null);
-		this.lowLoadWarnings.put(phase, value);
+		this.lowLoadWarnings.put(phase, toThreshold(lowLoadWarning));
 	}
 
 	public void setPhaseNearOverloadWarning(int phase, ResponsePdu nearOverloadWarning) {
-		var value = Optional.ofNullable(nearOverloadWarning).map(ResponsePdu::getValue).orElse(null);
-		this.nearOverloadWarnings.put(phase, value);
+		this.nearOverloadWarnings.put(phase, toThreshold(nearOverloadWarning));
 	}
 
 
@@ -128,8 +143,7 @@ public class Pdu {
 	}
 
 	public void setPhaseOverloadAlarm(int phase, ResponsePdu overloadAlarm) {
-		var value = Optional.ofNullable(overloadAlarm).map(ResponsePdu::getValue).orElse(null);
-		this.overloadAlarms.put(phase, value);
+		this.overloadAlarms.put(phase, toThreshold(overloadAlarm));
 	}
 
 	/**
@@ -169,15 +183,15 @@ public class Pdu {
 	}
 
 	public void setPhaseLowLoadWarnings(RawResponse lowLoadWarnings) {
-		distributePhaseValues(lowLoadWarnings, this.lowLoadWarnings, value -> Util.extractValue(value).orElse(null));
+		distributePhaseValues(lowLoadWarnings, this.lowLoadWarnings, value -> Util.extractDecimalValue(value).orElse(null));
 	}
 
 	public void setPhaseNearOverloadWarnings(RawResponse nearOverloadWarnings) {
-		distributePhaseValues(nearOverloadWarnings, this.nearOverloadWarnings, value -> Util.extractValue(value).orElse(null));
+		distributePhaseValues(nearOverloadWarnings, this.nearOverloadWarnings, value -> Util.extractDecimalValue(value).orElse(null));
 	}
 
 	public void setPhaseOverloadAlarms(RawResponse overloadAlarms) {
-		distributePhaseValues(overloadAlarms, this.overloadAlarms, value -> Util.extractValue(value).orElse(null));
+		distributePhaseValues(overloadAlarms, this.overloadAlarms, value -> Util.extractDecimalValue(value).orElse(null));
 	}
 
 	public void setPhaseOverloadRestrictions(RawResponse overloadRestrictions) {
@@ -188,6 +202,8 @@ public class Pdu {
 	@FieldDefaults(level = AccessLevel.PRIVATE)
 	public static class ResponsePdu extends BaseModel {
 		String value;
+		/** The unparsed response, kept so a reading can be re-extracted with different rounding. */
+		String raw;
 
 		@Override
 		public void parse(String response) {
@@ -195,6 +211,7 @@ public class Pdu {
 				this.log.warn("The response param is null or blank; ignore parsing the value");
 				return;
 			}
+			this.raw = response;
 			var isMultipleValues = response.split("\n").length > 1;
 			this.value = isMultipleValues ? response : Util.extractValue(response).orElse(null);
 			if (this.value == null) {

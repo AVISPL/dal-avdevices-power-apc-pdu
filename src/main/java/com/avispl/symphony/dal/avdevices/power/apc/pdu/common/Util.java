@@ -186,6 +186,28 @@ public final class Util {
 	 *         otherwise {@link Optional#empty()}
 	 */
 	public static Optional<String> extractValue(String input) {
+		return extract(input, true);
+	}
+
+	/**
+	 * Extracts a value the way {@link #extractValue(String)} does, but renders a unit-bearing reading as a decimal
+	 * instead of rounding it to a whole number, so that {@code 10 A} yields {@code 10.0} and {@code 10.5 A} survives
+	 * intact.
+	 *
+	 * <p>Used for the load thresholds, which are reported to Symphony as doubles.
+	 *
+	 * @param input the raw input string
+	 * @return an {@link Optional} containing the extracted value if matched; otherwise {@link Optional#empty()}
+	 */
+	public static Optional<String> extractDecimalValue(String input) {
+		return extract(input, false);
+	}
+
+	/**
+	 * @param roundUnitValue whether a value carrying an {@code A}/{@code VA}/{@code W} unit is rounded to a whole
+	 * number rather than kept as a decimal
+	 */
+	private static Optional<String> extract(String input, boolean roundUnitValue) {
 		if (input == null || input.isBlank()) {
 			LOG.warn("Input is null or blank; returning empty optional");
 			return Optional.empty();
@@ -203,9 +225,11 @@ public final class Util {
 			}
 			matcher = Constant.VALUE_WITH_UNIT_PATTERN.matcher(input);
 			if (matcher.find()) {
-				return Optional.ofNullable(roundValue(matcher.group(1)));
+				var value = matcher.group(1);
+				return Optional.ofNullable(roundUnitValue ? roundValue(value) : toDecimal(value));
 			}
-			if (input.contains(Constant.NEVER)) {
+            matcher = Constant.NEVER_PATTERN.matcher(input);
+			if (matcher.find()) {
 				return Optional.of(Constant.NEVER);
 			}
 			LOG.warn("Input '%s' does not match any known pattern; returning empty optional".formatted(input));
@@ -213,6 +237,21 @@ public final class Util {
 		} catch (Exception e) {
 			LOG.error("Failed to extract value from input '%s'; returning empty optional".formatted(input), e);
 			return Optional.empty();
+		}
+	}
+
+	/**
+	 * Renders a numeric string as a decimal, so that a whole number gains an explicit fractional part.
+	 *
+	 * @param input the numeric string
+	 * @return the value as a decimal string, or {@code null} if parsing fails
+	 */
+	private static String toDecimal(String input) {
+		try {
+			return String.valueOf(Double.parseDouble(input));
+		} catch (Exception e) {
+			LOG.error("Failed to convert value '%s' to decimal".formatted(input), e);
+			return null;
 		}
 	}
 

@@ -31,6 +31,12 @@ import com.avispl.symphony.dal.util.StringUtils;
 public final class ControllerHelper {
 	private static final Logger LOG = Logger.ofClass(ControllerHelper.class);
 
+	private static final String PHASE = "Phase";
+	private static final String LOW_LOAD_WARNING = "LowLoadWarning";
+	private static final String NEAR_OVERLOAD_WARNING = "NearOverloadWarning";
+	private static final String OVERLOAD_ALARM = "OverloadAlarm";
+	private static final String OVERLOAD_RESTRICTION = "OverloadRestriction";
+
 	/**
 	 * Generates a list of controllable configuration properties for the given {@link Pdu}.
 	 *
@@ -95,17 +101,18 @@ public final class ControllerHelper {
 
 		var configProperty = property.split(Constant.HASH)[1];
 		var phase = extractPhase(configProperty);
+		validateThresholdOrder(configProperty, phase, String.valueOf(value), pdu);
 		var param = buildParam(phase, configProperty, String.valueOf(value), generation);
-		if (configProperty.contains("LowLoadWarning")) {
+		if (configProperty.contains(LOW_LOAD_WARNING)) {
 			return Command.LOW_LOAD_WARNING.requestFor(generation, param);
 		}
-		if (configProperty.contains("NearOverloadWarning")) {
+		if (configProperty.contains(NEAR_OVERLOAD_WARNING)) {
 			return Command.NEAR_OVERLOAD_WARNING.requestFor(generation, param);
 		}
-		if (configProperty.contains("OverloadAlarm")) {
+		if (configProperty.contains(OVERLOAD_ALARM)) {
 			return Command.OVERLOAD_ALARM.requestFor(generation, param);
 		}
-		if (configProperty.contains("OverloadRestriction")) {
+		if (configProperty.contains(OVERLOAD_RESTRICTION)) {
 			return Command.OVERLOAD_RESTRICTION.requestFor(generation, param);
 		}
 
@@ -183,6 +190,79 @@ public final class ControllerHelper {
 			return 3;
 		}
 		return 1;
+	}
+
+	/**
+	 * Enforces the ordering the firmware requires between the three load thresholds, so a violating control fails here
+	 * rather than after a round trip the operator never sees the result of.
+	 *
+	 * <p>The rules are {@code lowLoad < nearOverload <= overloadAlarm}. Note they are not symmetric: near-overload must
+	 * be strictly above low-load but may equal the overload alarm. An AP7920B rejects a violation with
+	 * {@code Near Overload Warning Phase 1 must be greater than Low Load Warning and less than or equal to Overload
+	 * Alarm, set failed.}, and the messages below are transcribed from those responses.
+	 *
+	 * <p>Neither the {@code phLowLoad}/{@code phNearOver}/{@code phOverLoad} CLI reference nor the web interface's
+	 * "Configure Load Thresholds" documentation states this dependency; both describe the value only as amps. The device
+	 * is therefore the sole source for these rules, which is why they are asserted rather than cited.
+	 *
+	 * <p>A threshold that is missing or unparseable is skipped instead of failing the control: the value simply is not
+	 * known locally, and the device stays the final authority. Zero is left legal on purpose - it is the documented
+	 * default for the low-load warning and disables it.
+	 *
+	 * @param configProperty the configuration property name, without its group prefix
+	 * @param phase the phase the control targets
+	 * @param value the requested value
+	 * @param pdu the currently known thresholds to compare against
+	 * @throws InvalidArgumentException if the requested value would break the required ordering
+	 */
+	private static void validateThresholdOrder(String configProperty, Integer phase, String value, Pdu pdu) {
+		// The restriction control carries a switch state rather than an amperage, so it has no ordering to satisfy.
+		if (configProperty.contains(OVERLOAD_RESTRICTION)) {
+			return;
+		}
+		var requested = toThreshold(value);
+		if (requested == null) {
+			return;
+		}
+		var is3Phases = configProperty.startsWith(PHASE);
+		var lowLoad = toThreshold(is3Phases ? pdu.getLowLoadWarnings().get(phase) : pdu.getLowLoadWarning());
+		var nearOverload = toThreshold(is3Phases ? pdu.getNearOverloadWarnings().get(phase) : pdu.getNearOverloadWarning());
+		var overloadAlarm = toThreshold(is3Phases ? pdu.getOverloadAlarms().get(phase) : pdu.getOverloadAlarm());
+
+		if (configProperty.contains(LOW_LOAD_WARNING) && nearOverload != null && requested >= nearOverload) {
+			throw thresholdViolation("Low Load Warning", phase, "must be less than Near Overload Warning");
+		}
+		if (configProperty.contains(NEAR_OVERLOAD_WARNING)
+				&& ((lowLoad != null && requested <= lowLoad) || (overloadAlarm != null && requested > overloadAlarm))) {
+			throw thresholdViolation("Near Overload Warning", phase,
+					"must be greater than Low Load Warning and less than or equal to Overload Alarm");
+		}
+		if (configProperty.contains(OVERLOAD_ALARM) && nearOverload != null && requested < nearOverload) {
+			throw thresholdViolation("Overload Alarm", phase, "must be greater than or equal to Near Overload Warning");
+		}
+	}
+
+	/** Builds a violation error worded the way the device words its own rejection. */
+	private static InvalidArgumentException thresholdViolation(String label, Integer phase, String rule) {
+		return new InvalidArgumentException("%s Phase %d %s, set failed.".formatted(label, phase, rule));
+	}
+
+	/**
+	 * Parses a threshold reading into a comparable number.
+	 *
+	 * @param value the reading, which may be {@code null} or a placeholder such as {@link Constant#NOT_AVAILABLE}
+	 * @return the parsed value, or {@code null} when it cannot be compared
+	 */
+	private static Double toThreshold(String value) {
+		if (StringUtils.isNullOrEmpty(value, true)) {
+			return null;
+		}
+		try {
+			return Double.valueOf(value.trim());
+		} catch (NumberFormatException e) {
+			LOG.warn("Skip threshold comparison; '%s' is not numeric".formatted(value));
+			return null;
+		}
 	}
 
 	/**
