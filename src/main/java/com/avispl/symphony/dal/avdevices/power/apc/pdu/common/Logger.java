@@ -19,6 +19,12 @@ public final class Logger {
 		return new Logger(LogFactory.getLog(clazz));
 	}
 
+	public void debug(Object o) {
+		if (this.log.isDebugEnabled()) {
+			this.log.debug(o);
+		}
+	}
+
 	public void info(Object o) {
 		if (this.log.isInfoEnabled()) {
 			this.log.info(o);
