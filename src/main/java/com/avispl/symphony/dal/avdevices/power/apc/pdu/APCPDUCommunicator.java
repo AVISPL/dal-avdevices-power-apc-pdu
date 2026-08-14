@@ -95,13 +95,13 @@ public class APCPDUCommunicator extends BaseCommunicator implements Monitorable,
 		this.reentrantLock.lock();
 		try {
 			this.populateData();
-			var statistics = new HashMap<>(MonitoringHelper.generateGeneral(this.is3PhasesPdu, this.generalInformation, this.pdu));
+			var statistics = new HashMap<>(MonitoringHelper.generateGeneral(this.is3PhasesPdu, this.generation, this.generalInformation, this.pdu));
 			statistics.putAll(MonitoringHelper.generateAdapterMetadata(this.versionProperties));
 			statistics.putAll(MonitoringHelper.generateConfiguration(this.is3PhasesPdu, this.pdu));
 			statistics.putAll(MonitoringHelper.generateOutlets(this.outlets));
 
 			var controllableProperties = new ArrayList<AdvancedControllableProperty>(
-					ControllerHelper.generateConfigurationControllers(this.is3PhasesPdu, this.pdu));
+					ControllerHelper.generateConfigurationControllers(this.is3PhasesPdu, this.generation, this.pdu));
 			controllableProperties.addAll(ControllerHelper.generateOutletsControllers(this.outlets));
 
 			this.localExtendedStatistics.setStatistics(statistics);
@@ -269,7 +269,7 @@ public class APCPDUCommunicator extends BaseCommunicator implements Monitorable,
 	/** Reads and normalizes the overload restriction, which this generation reports as prose. */
 	private String readRestriction(int phase) throws Exception {
 		var response = this.send(Command.OVERLOAD_RESTRICTION.requestFor(this.generation, phase), RawResponse.class);
-		return Util.toRestrictionState(response.getValue());
+		return Util.toRestrictionState2G(response.getValue());
 	}
 
 	/**

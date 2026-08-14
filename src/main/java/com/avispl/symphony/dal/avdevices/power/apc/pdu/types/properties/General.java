@@ -38,4 +38,7 @@ public enum General {
 	);
 
 	public static final List<General> THREE_PHASE_PROPERTIES = List.of(PHASE_1_CURRENT, PHASE_2_CURRENT, PHASE_3_CURRENT);
+
+	/** Properties backed by the {@code power} reading, which not every generation can serve. */
+	public static final List<General> POWER_PROPERTIES = List.of(APPARENT_POWER, ACTIVE_POWER);
 }

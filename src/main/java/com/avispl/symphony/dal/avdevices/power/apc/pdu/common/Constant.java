@@ -23,6 +23,14 @@ public final class Constant {
 	public static final String HASH = "#";
 	public static final int MAX_PHASE = 3;
 	public static final String NEVER = "never";
+	/**
+	 * Value the outlet delay commands take to disable a delay. The device reports the resulting state back as
+	 * {@link #NEVER} but rejects that word as an argument, so reads and writes do not share a representation.
+	 *
+	 * <p>Undocumented: the CLI reference lists only a {@code 1}-{@code 7200} time for {@code olOffDelay}/{@code olOnDelay}
+	 * and documents {@code never} solely for {@code devStartDly}. Verified against the device.
+	 */
+	public static final String NEVER_DELAY = "-1";
 	public static final String MIN_VALUE = "0";
 	public static final String UNDERSCORE = "_";
 	public static final String SPACE = " ";
@@ -44,17 +52,22 @@ public final class Constant {
 	public static final Pattern SUCCESS_MARKER_PATTERN = Pattern.compile("(?m)^[ \\t]*(?:OK|E000:[ \\t]*Success)[ \\t]*\\R?");
 	public static final Pattern VALUE_WITH_UNIT_PATTERN = Pattern.compile("(\\d+(?:\\.\\d+)?)\\s*(A|VA|W)");
     public static final Pattern NEVER_PATTERN = Pattern.compile("(?i)never");
+	/** Matches the {@link #NEVER_DELAY} sentinel an outlet delay reading uses for the disabled state. */
+	public static final Pattern NEVER_DELAY_PATTERN = Pattern.compile("(?<![\\d.-])-1(?![\\d.])");
 	/** {@code rpdu} spells the unit out ("is 5 seconds."), {@code rpdu2g} abbreviates it ("5 sec"). */
 	public static final Pattern TIME_SECONDS_PATTERN = Pattern.compile("(\\d+)\\s*sec(?:onds?)?\\b");
 	public static final Pattern OVERLOAD_SETTING_PATTERN = Pattern.compile("Overload restriction is (\\S+)");
 	/**
 	 * {@code rpdu2g} reports the overload restriction as prose ("Always Allow Turn On") rather than the on/off token
-	 * {@code rpdu} uses. Only the disabled wording is matched; anything else means some restriction is in effect, which
-	 * keeps the mapping correct without having to enumerate the {@code near} and {@code over} wordings.
+	 * {@code rpdu} uses, even though the CLI reference documents the reply as the bare {@code none}/{@code near}/
+	 * {@code over} token. Both shapes are therefore recognised on a read.
 	 */
 	public static final String RESTRICTION_DISABLED_2G = "always allow";
-	/** Values of the 2nd generation `phRestrictn` setter, mapped onto the same on/off property as 1st generation. */
+	/** Prose marker for the {@code near} state, which the web interface labels "On Warning". */
+	public static final String RESTRICTION_NEAR_PROSE_2G = "warning";
+	/** Values the 2nd generation {@code phRestrictn} setter accepts. */
 	public static final String RESTRICTION_NONE_2G = "none";
+	public static final String RESTRICTION_NEAR_2G = "near";
 	public static final String RESTRICTION_OVER_2G = "over";
 	/** Measurement argument required by the 2nd generation `phReading` command. */
 	public static final String READING_CURRENT_2G = "current";
