@@ -254,7 +254,7 @@ public class APCPDUCommunicator extends BaseCommunicator implements Monitorable,
 	 * identical across generations. Differences handled here are the dialect's own: {@code prodInfo} replaces
 	 * {@code ver}, the phase commands take an explicit phase argument where 1st generation reads a single-phase value
 	 * with no argument, the outlet commands take {@code all} instead of a comma-separated outlet list, and the overload
-	 * restriction is reported as prose rather than a token.
+	 * restriction is reported as text rather than a token.
 	 *
 	 * @throws Exception if command execution or parsing fails
 	 */
@@ -306,7 +306,7 @@ public class APCPDUCommunicator extends BaseCommunicator implements Monitorable,
 		return this.send(Command.CURRENT.requestFor(this.generation, param), ResponsePdu.class);
 	}
 
-	/** Reads and normalizes the overload restriction, which this generation reports as prose. */
+	/** Reads and normalizes the overload restriction, which this generation reports as text. */
 	private String readRestriction(int phase) throws Exception {
 		var response = this.send(Command.OVERLOAD_RESTRICTION.requestFor(this.generation, phase), RawResponse.class);
 		return Util.toRestrictionState(response.getValue());

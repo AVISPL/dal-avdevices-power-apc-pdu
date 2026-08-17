@@ -9,7 +9,7 @@ import com.avispl.symphony.dal.avdevices.power.apc.pdu.bases.BaseModel;
 
 /**
  * Carries a normalized response verbatim, for commands whose value cannot be recovered by the shared numeric
- * extraction - such as the 2nd generation {@code phRestrictn}, which reports prose rather than a number or token.
+ * extraction - such as the 2nd generation {@code phRestrictn}, which reports text rather than a number or token.
  *
  * @author Symphony Dev Team
  * @since 1.1.0

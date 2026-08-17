@@ -288,7 +288,7 @@ public final class Util {
 	 * Normalizes a 2nd generation {@code phRestrictn} reading onto the on/off token 1st generation reports, so that the
 	 * resulting Symphony property carries the same value on both generations.
 	 *
-	 * <p>{@code rpdu} answers {@code Overload restriction is off for 1.} whereas {@code rpdu2g} answers prose such as
+	 * <p>{@code rpdu} answers {@code Overload restriction is off for 1.} whereas {@code rpdu2g} answers text such as
 	 * {@code 1: Always Allow Turn On}. Only the "always allow" wording means unrestricted; every other wording denotes
 	 * some restriction being in effect, which avoids having to enumerate the {@code near} and {@code over} phrasings.
 	 *

@@ -329,7 +329,7 @@ class PduDialectTest {
 		}
 
 		@Test
-		@DisplayName("per-phase restriction prose maps to the shared on/off value")
+		@DisplayName("per-phase restriction text maps to the shared on/off value")
 		void distributesRestrictions() {
 			var pdu = new Pdu();
 			pdu.setPhaseOverloadRestrictions(response("1: Always Allow Turn On \n2: Restrict on Overload\n3: Restrict on Near Overload"));
@@ -353,7 +353,7 @@ class PduDialectTest {
 	@DisplayName("Overload restriction")
 	class OverloadRestriction {
 		@Test
-		@DisplayName("2nd generation prose maps onto the same on/off value 1st generation reports")
+		@DisplayName("2nd generation text maps onto the same on/off value 1st generation reports")
 		void normalizesRpdu2gWording() {
 			Assertions.assertEquals("off", Util.toRestrictionState("1: Always Allow Turn On"));
 			Assertions.assertEquals("on", Util.toRestrictionState("1: Restrict on Overload"));
