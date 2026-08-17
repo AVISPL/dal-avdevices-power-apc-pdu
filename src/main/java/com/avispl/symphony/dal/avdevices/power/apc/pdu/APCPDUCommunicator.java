@@ -4,10 +4,13 @@
 package com.avispl.symphony.dal.avdevices.power.apc.pdu;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Properties;
+import java.util.Set;
 
 import org.apache.commons.collections.CollectionUtils;
 
@@ -60,6 +63,12 @@ public class APCPDUCommunicator extends BaseCommunicator implements Monitorable,
 	private Outlets outlets;
 	/** CLI dialect the connected device speaks; resolved once per connection on the first poll. */
 	private PduGeneration generation;
+	/**
+	 * Display names of properties reported as dynamic (historical) statistics instead of regular monitored statistics.
+	 * Configured as a comma-separated string via {@link #setHistoricalProperties(String)}; empty by default, which
+	 * means no property is reported as dynamic.
+	 */
+	private final Set<String> historicalProperties;
 
 	public APCPDUCommunicator() {
 		this.localExtendedStatistics = new ExtendedStatistics();
@@ -70,6 +79,33 @@ public class APCPDUCommunicator extends BaseCommunicator implements Monitorable,
 		this.generalInformation = new GeneralInformation();
 		this.pdu = new Pdu();
 		this.outlets = new Outlets();
+		this.historicalProperties = new HashSet<>();
+	}
+
+	/**
+	 * Gets display names of properties reported as dynamic statistics.
+	 *
+	 * @return a comma-separated, trimmed list of property display names
+	 */
+	public String getHistoricalProperties() {
+		return String.join(",", this.historicalProperties);
+	}
+
+	/**
+	 * Sets display names of properties to report as dynamic statistics instead of regular monitored statistics.
+	 *
+	 * @param historicalProperties a comma-separated list of property display names; entries are trimmed, blank
+	 * entries are ignored
+	 */
+	public void setHistoricalProperties(String historicalProperties) {
+		this.historicalProperties.clear();
+		if (StringUtils.isNullOrEmpty(historicalProperties, true)) {
+			return;
+		}
+		Arrays.stream(historicalProperties.split(","))
+				.map(String::trim)
+				.filter(property -> !property.isEmpty())
+				.forEach(this.historicalProperties::add);
 	}
 
 	@Override
@@ -87,6 +123,7 @@ public class APCPDUCommunicator extends BaseCommunicator implements Monitorable,
 		this.localExtendedStatistics.getStatistics().clear();
 		this.localExtendedStatistics.getControllableProperties().clear();
 		this.versionProperties.clear();
+		this.historicalProperties.clear();
 		super.internalDestroy();
 	}
 
@@ -95,7 +132,7 @@ public class APCPDUCommunicator extends BaseCommunicator implements Monitorable,
 		this.reentrantLock.lock();
 		try {
 			this.populateData();
-			var statistics = new HashMap<>(MonitoringHelper.generateGeneral(this.is3PhasesPdu, this.generalInformation, this.pdu));
+			var statistics = new HashMap<>(MonitoringHelper.generateGeneral(this.generalInformation, this.pdu));
 			statistics.putAll(MonitoringHelper.generateAdapterMetadata(this.versionProperties));
 			statistics.putAll(MonitoringHelper.generateConfiguration(this.is3PhasesPdu, this.pdu));
 			statistics.putAll(MonitoringHelper.generateOutlets(this.outlets));
@@ -104,9 +141,12 @@ public class APCPDUCommunicator extends BaseCommunicator implements Monitorable,
 					ControllerHelper.generateConfigurationControllers(this.is3PhasesPdu, this.pdu));
 			controllableProperties.addAll(ControllerHelper.generateOutletsControllers(this.outlets));
 
+			// Routes each current-related property to statistics or dynamicStatistics based on historicalProperties.
+			var dynamicStatistics = MonitoringHelper.generateGeneralDynamicProperties(this.is3PhasesPdu, this.pdu, this.historicalProperties, statistics);
+
 			this.localExtendedStatistics.setStatistics(statistics);
 			this.localExtendedStatistics.setControllableProperties(controllableProperties);
-			this.localExtendedStatistics.setDynamicStatistics(MonitoringHelper.generateGeneralDynamicProperties(is3PhasesPdu, this.pdu));
+			this.localExtendedStatistics.setDynamicStatistics(dynamicStatistics);
 		} finally {
 			this.reentrantLock.unlock();
 		}
