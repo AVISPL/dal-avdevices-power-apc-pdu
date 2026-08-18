@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -34,14 +35,13 @@ public final class MonitoringHelper {
 	/**
 	 * Generates general properties from the provided {@link GeneralInformation}.
 	 *
-	 * @param is3Phases indicates whether the PDU is 3-phase
-	 * @param generation the firmware generation, which decides whether the power properties can be served at all
 	 * @param generalInformation the source of general device information (must not be {@code null})
 	 * @param pdu the source of PDU data (must not be {@code null})
+	 * @param generation the firmware generation, which decides whether the power properties can be served at all
 	 * @return a map of property display names to their corresponding values; never {@code null}
 	 * @throws InvalidArgumentException if an unexpected {@link General} value is encountered
 	 */
-	public static Map<String, String> generateGeneral(boolean is3Phases, PduGeneration generation, GeneralInformation generalInformation, Pdu pdu) {
+	public static Map<String, String> generateGeneral(GeneralInformation generalInformation, Pdu pdu, PduGeneration generation) {
 		var properties = new HashMap<String, String>();
 		var lowerCaseValues = List.of(General.AOS_VERSION, General.INPUT_TYPE, General.PDU_VERSION);
 		var isPowerSupported = Command.POWER.isSupportedOn(generation);
@@ -63,21 +63,6 @@ public final class MonitoringHelper {
 			};
 			properties.put(general.getDisplayName(), Util.mapToValue(propertyValue, !lowerCaseValues.contains(general)));
 		}
-		if (is3Phases) {
-			for (General general : General.THREE_PHASE_PROPERTIES) {
-				// The stored readings are already bare numbers; extracting again finds no unit and yields nothing.
-				String propertyValue = switch (general) {
-					case PHASE_1_CURRENT -> pdu.getCurrents().get(1);
-					case PHASE_2_CURRENT -> pdu.getCurrents().get(2);
-					case PHASE_3_CURRENT -> pdu.getCurrents().get(3);
-					default -> throw new InvalidArgumentException("Unexpected General in THREE_PHASE_PROPERTIES: " + general);
-				};
-				properties.put(general.getDisplayName(), Util.mapToValue(propertyValue));
-			}
-		} else {
-			properties.put(General.CURRENT.getDisplayName(), Util.mapToValue(pdu.getCurrent()));
-		}
-
 		return properties;
 	}
 
@@ -180,28 +165,37 @@ public final class MonitoringHelper {
 	}
 
 	/**
-	 * Generates dynamic current-related properties based on the PDU input type.
-	 * Returns phase currents for {@link InputType#THREE_PHASE} PDUs, or total current for non–3-phase PDUs.
+	 * Generates current-related properties based on the PDU input type, routing each one to either {@code statistics}
+	 * or the returned dynamic map depending on whether it is listed in {@code historicalProperties}.
+	 * Considers phase currents for {@link InputType#THREE_PHASE} PDUs, or total current for non–3-phase PDUs.
 	 *
 	 * @param is3Phases indicates whether the PDU is 3-phase
 	 * @param pdu the PDU source data
-	 * @return map of current property names to their values
+	 * @param historicalProperties display names of properties to report as dynamic instead of regular; supports
+	 * {@link General#CURRENT}, {@link General#PHASE_1_CURRENT}, {@link General#PHASE_2_CURRENT} and
+	 * {@link General#PHASE_3_CURRENT}
+	 * @param statistics the regular statistics map to add non-historical current properties to
+	 * @return map of dynamic current property names to their values; empty when none of the applicable properties
+	 * are listed in {@code historicalProperties}
+	 * @throws InvalidArgumentException if an unexpected {@link General} value is encountered
 	 */
-	public static Map<String, String> generateGeneralDynamicProperties(boolean is3Phases, Pdu pdu) {
+	public static Map<String, String> generateGeneralDynamicProperties(boolean is3Phases, Pdu pdu, Set<String> historicalProperties,
+			Map<String, String> statistics) {
 		var dynamicStatistics = new HashMap<String, String>();
-		if (is3Phases) {
-			for (General general : General.THREE_PHASE_PROPERTIES) {
-				// The stored readings are already bare numbers; extracting again finds no unit and yields nothing.
-				String propertyValue = switch (general) {
-					case PHASE_1_CURRENT -> pdu.getCurrents().get(1);
-					case PHASE_2_CURRENT -> pdu.getCurrents().get(2);
-					case PHASE_3_CURRENT -> pdu.getCurrents().get(3);
-					default -> throw new InvalidArgumentException("Unexpected General in THREE_PHASE_PROPERTIES: " + general);
-				};
-				dynamicStatistics.put(general.getDisplayName(), Util.mapToValue(propertyValue));
+		for (General general : is3Phases ? General.THREE_PHASE_PROPERTIES : List.of(General.CURRENT)) {
+			String propertyValue = switch (general) {
+				case PHASE_1_CURRENT -> pdu.getCurrents().get(1);
+				case PHASE_2_CURRENT -> pdu.getCurrents().get(2);
+				case PHASE_3_CURRENT -> pdu.getCurrents().get(3);
+				case CURRENT -> pdu.getCurrent();
+				default -> throw new InvalidArgumentException("Unexpected General for dynamic property: " + general);
+			};
+			var mappedValue = Util.mapToValue(propertyValue);
+			if (historicalProperties.contains(general.getDisplayName())) {
+				dynamicStatistics.put(general.getDisplayName(), mappedValue);
+			} else {
+				statistics.put(general.getDisplayName(), mappedValue);
 			}
-		} else {
-			dynamicStatistics.put(General.CURRENT.getDisplayName(), Util.mapToValue(pdu.getCurrent()));
 		}
 
 		return dynamicStatistics;

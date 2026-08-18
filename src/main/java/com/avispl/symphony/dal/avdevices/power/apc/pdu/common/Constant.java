@@ -58,9 +58,9 @@ public final class Constant {
 	public static final Pattern TIME_SECONDS_PATTERN = Pattern.compile("(\\d+)\\s*sec(?:onds?)?\\b");
 	public static final Pattern OVERLOAD_SETTING_PATTERN = Pattern.compile("Overload restriction is (\\S+)");
 	/**
-	 * {@code rpdu2g} reports the overload restriction as prose ("Always Allow Turn On") rather than the on/off token
-	 * {@code rpdu} uses, even though the CLI reference documents the reply as the bare {@code none}/{@code near}/
-	 * {@code over} token. Both shapes are therefore recognised on a read.
+	 * {@code rpdu2g} reports the overload restriction as text ("Always Allow Turn On") rather than the on/off token
+	 * {@code rpdu} uses. Only the disabled wording is matched; anything else means some restriction is in effect, which
+	 * keeps the mapping correct without having to enumerate the {@code near} and {@code over} wordings.
 	 */
 	public static final String RESTRICTION_DISABLED_2G = "always allow";
 	/** Prose marker for the {@code near} state, which the web interface labels "On Warning". */

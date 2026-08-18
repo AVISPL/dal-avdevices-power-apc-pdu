@@ -73,7 +73,7 @@ AdapterBuildDate, AdapterVersion, AdapterUptime, AdapterUptime(min)
 For 3-phase PDUs, these properties are prefixed per phase — for example: Phase1LowLoadWarning(A), Phase2OverloadAlarm(A), Phase3OverloadRestriction.
 
 ### Per-outlet properties
-Outlets are named using the pattern Source_User_Outlet_Number (e.g., Local_Apc_Outlet_01).
+Outlets are named using the pattern Outlet_Number, zero-padded to two digits (e.g., Outlet_01), numbered sequentially from 1 up to the device's reported outlet count — independent of phase.
 
 | Property | Description |
 |---|---|
