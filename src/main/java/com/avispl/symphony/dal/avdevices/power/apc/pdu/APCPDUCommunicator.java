@@ -132,7 +132,7 @@ public class APCPDUCommunicator extends BaseCommunicator implements Monitorable,
 		this.reentrantLock.lock();
 		try {
 			this.populateData();
-			var statistics = new HashMap<>(MonitoringHelper.generateGeneral(this.generalInformation, this.pdu));
+			var statistics = new HashMap<>(MonitoringHelper.generateGeneral(this.generalInformation, this.pdu, this.generation));
 			statistics.putAll(MonitoringHelper.generateAdapterMetadata(this.versionProperties));
 			statistics.putAll(MonitoringHelper.generateConfiguration(this.is3PhasesPdu, this.pdu));
 			statistics.putAll(MonitoringHelper.generateOutlets(this.outlets));

@@ -312,10 +312,10 @@ class PduDialectTest {
 			pdu.setPhaseCurrents(response("1: 0.4 A\n2: 1.6 A\n3: 2.5 A"));
 			pdu.setPhaseOverloadAlarms(response("1: 10.0 A\n2: 10.0 A\n3: 12.0 A"));
 
-			Assertions.assertEquals("0", pdu.getCurrents().get(1));
-			Assertions.assertEquals("2", pdu.getCurrents().get(2));
-			Assertions.assertEquals("3", pdu.getCurrents().get(3));
-			Assertions.assertEquals("12", pdu.getOverloadAlarms().get(3));
+			Assertions.assertEquals("0.4", pdu.getCurrents().get(1));
+			Assertions.assertEquals("1.6", pdu.getCurrents().get(2));
+			Assertions.assertEquals("2.5", pdu.getCurrents().get(3));
+			Assertions.assertEquals("12.0", pdu.getOverloadAlarms().get(3));
 		}
 
 		@Test
@@ -324,19 +324,19 @@ class PduDialectTest {
 			var pdu = new Pdu();
 			pdu.setPhaseCurrents(response("1: 0.0 A"));
 
-			Assertions.assertEquals("0", pdu.getCurrents().get(1));
+			Assertions.assertEquals("0.0", pdu.getCurrents().get(1));
 			Assertions.assertNull(pdu.getCurrents().get(2));
 		}
 
 		@Test
-		@DisplayName("per-phase restriction text maps to the shared on/off value")
+		@DisplayName("per-phase restriction text maps to the none/near/over state")
 		void distributesRestrictions() {
 			var pdu = new Pdu();
 			pdu.setPhaseOverloadRestrictions(response("1: Always Allow Turn On \n2: Restrict on Overload\n3: Restrict on Near Overload"));
 
-			Assertions.assertEquals("off", pdu.getOverloadRestrictions().get(1));
-			Assertions.assertEquals("on", pdu.getOverloadRestrictions().get(2));
-			Assertions.assertEquals("on", pdu.getOverloadRestrictions().get(3));
+			Assertions.assertEquals("none", pdu.getOverloadRestrictions().get(1));
+			Assertions.assertEquals("over", pdu.getOverloadRestrictions().get(2));
+			Assertions.assertEquals("near", pdu.getOverloadRestrictions().get(3));
 		}
 
 		@Test
@@ -344,7 +344,7 @@ class PduDialectTest {
 			var pdu = new Pdu();
 			pdu.setPhaseCurrents(response("E000: Success\n1: 0.4 A\nnonsense"));
 
-			Assertions.assertEquals("0", pdu.getCurrents().get(1));
+			Assertions.assertEquals("0.4", pdu.getCurrents().get(1));
 			Assertions.assertEquals(1, pdu.getCurrents().size());
 		}
 	}

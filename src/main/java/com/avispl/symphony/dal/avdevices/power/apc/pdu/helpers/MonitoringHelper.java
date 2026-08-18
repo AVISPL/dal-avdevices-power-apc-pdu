@@ -37,11 +37,11 @@ public final class MonitoringHelper {
 	 *
 	 * @param generalInformation the source of general device information (must not be {@code null})
 	 * @param pdu the source of PDU data (must not be {@code null})
+	 * @param generation the firmware generation, which decides whether the power properties can be served at all
 	 * @return a map of property display names to their corresponding values; never {@code null}
 	 * @throws InvalidArgumentException if an unexpected {@link General} value is encountered
 	 */
-	public static Map<String, String> generateGeneral(GeneralInformation generalInformation, Pdu pdu) {
-
+	public static Map<String, String> generateGeneral(GeneralInformation generalInformation, Pdu pdu, PduGeneration generation) {
 		var properties = new HashMap<String, String>();
 		var lowerCaseValues = List.of(General.AOS_VERSION, General.INPUT_TYPE, General.PDU_VERSION);
 		var isPowerSupported = Command.POWER.isSupportedOn(generation);
@@ -184,9 +184,9 @@ public final class MonitoringHelper {
 		var dynamicStatistics = new HashMap<String, String>();
 		for (General general : is3Phases ? General.THREE_PHASE_PROPERTIES : List.of(General.CURRENT)) {
 			String propertyValue = switch (general) {
-				case PHASE_1_CURRENT -> Util.extractValue(pdu.getCurrents().get(1)).orElse(null);
-				case PHASE_2_CURRENT -> Util.extractValue(pdu.getCurrents().get(2)).orElse(null);
-				case PHASE_3_CURRENT -> Util.extractValue(pdu.getCurrents().get(3)).orElse(null);
+				case PHASE_1_CURRENT -> pdu.getCurrents().get(1);
+				case PHASE_2_CURRENT -> pdu.getCurrents().get(2);
+				case PHASE_3_CURRENT -> pdu.getCurrents().get(3);
 				case CURRENT -> pdu.getCurrent();
 				default -> throw new InvalidArgumentException("Unexpected General for dynamic property: " + general);
 			};
