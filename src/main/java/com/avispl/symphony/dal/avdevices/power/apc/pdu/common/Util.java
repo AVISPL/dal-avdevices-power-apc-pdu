@@ -186,7 +186,7 @@ public final class Util {
 	 *         otherwise {@link Optional#empty()}
 	 */
 	public static Optional<String> extractValue(String input) {
-		return extract(input, true);
+		return extract(input, NumericForm.ROUNDED);
 	}
 
 	/**
@@ -200,14 +200,33 @@ public final class Util {
 	 * @return an {@link Optional} containing the extracted value if matched; otherwise {@link Optional#empty()}
 	 */
 	public static Optional<String> extractDecimalValue(String input) {
-		return extract(input, false);
+		return extract(input, NumericForm.DECIMAL);
 	}
 
 	/**
-	 * @param roundUnitValue whether a value carrying an {@code A}/{@code VA}/{@code W} unit is rounded to a whole
-	 * number rather than kept as a decimal
+	 * Extracts a value the way {@link #extractValue(String)} does, but keeps the number exactly as the device wrote it,
+	 * stripping only the unit - {@code 0.0 A} yields {@code 0.0} and {@code 10 A} yields {@code 10}.
+	 *
+	 * <p>Used for current readings, which are reported verbatim rather than normalized.
+	 *
+	 * @param input the raw input string
+	 * @return an {@link Optional} containing the extracted value if matched; otherwise {@link Optional#empty()}
 	 */
-	private static Optional<String> extract(String input, boolean roundUnitValue) {
+	public static Optional<String> extractExactValue(String input) {
+		return extract(input, NumericForm.VERBATIM);
+	}
+
+	/** How a value carrying an {@code A}/{@code VA}/{@code W} unit is rendered once the unit is stripped. */
+	private enum NumericForm {
+		/** Rounded to a whole number. */
+		ROUNDED,
+		/** Always carries a fractional part. */
+		DECIMAL,
+		/** Exactly as the device wrote it. */
+		VERBATIM
+	}
+
+	private static Optional<String> extract(String input, NumericForm form) {
 		if (input == null || input.isBlank()) {
 			LOG.warn("Input is null or blank; returning empty optional");
 			return Optional.empty();
@@ -226,7 +245,11 @@ public final class Util {
 			matcher = Constant.VALUE_WITH_UNIT_PATTERN.matcher(input);
 			if (matcher.find()) {
 				var value = matcher.group(1);
-				return Optional.ofNullable(roundUnitValue ? roundValue(value) : toDecimal(value));
+				return Optional.ofNullable(switch (form) {
+					case ROUNDED -> roundValue(value);
+					case DECIMAL -> toDecimal(value);
+					case VERBATIM -> value;
+				});
 			}
             matcher = Constant.NEVER_PATTERN.matcher(input);
 			if (matcher.find()) {
@@ -288,7 +311,7 @@ public final class Util {
 	 * Normalizes a 2nd generation {@code phRestrictn} reading onto the on/off token 1st generation reports, so that the
 	 * resulting Symphony property carries the same value on both generations.
 	 *
-	 * <p>{@code rpdu} answers {@code Overload restriction is off for 1.} whereas {@code rpdu2g} answers prose such as
+	 * <p>{@code rpdu} answers {@code Overload restriction is off for 1.} whereas {@code rpdu2g} answers text such as
 	 * {@code 1: Always Allow Turn On}. Only the "always allow" wording means unrestricted; every other wording denotes
 	 * some restriction being in effect, which avoids having to enumerate the {@code near} and {@code over} phrasings.
 	 *
@@ -301,6 +324,56 @@ public final class Util {
 			return null;
 		}
 		return input.toLowerCase().contains(Constant.RESTRICTION_DISABLED_2G) ? "off" : Constant.ON;
+	}
+
+	/**
+	 * Normalizes a 2nd generation {@code phRestrictn} reading onto the token the setter accepts, so the property round
+	 * trips through the same three values the device does.
+	 *
+	 * <p>Two reply shapes are handled: the bare {@code none}/{@code near}/{@code over} token the CLI reference documents,
+	 * and the prose an AP7920B actually returns ("Always Allow Turn On"). The {@code near} test runs before the
+	 * {@code over} test on purpose - a near-overload wording mentions overload too, so checking {@code over} first would
+	 * mask it.
+	 *
+	 * @param input the raw reading
+	 * @return {@link Constant#RESTRICTION_NONE_2G}, {@link Constant#RESTRICTION_NEAR_2G} or
+	 * {@link Constant#RESTRICTION_OVER_2G}, or {@code null} when the wording is not recognised
+	 */
+	public static String toRestrictionState2G(String input) {
+		if (StringUtils.isNullOrEmpty(input, true)) {
+			LOG.warn("Skip restriction mapping: the input is null or empty");
+			return null;
+		}
+		var normalized = input.toLowerCase();
+		if (normalized.contains(Constant.RESTRICTION_DISABLED_2G) || normalized.contains(Constant.RESTRICTION_NONE_2G)) {
+			return Constant.RESTRICTION_NONE_2G;
+		}
+		if (normalized.contains(Constant.RESTRICTION_NEAR_2G) || normalized.contains(Constant.RESTRICTION_NEAR_PROSE_2G)) {
+			return Constant.RESTRICTION_NEAR_2G;
+		}
+		if (normalized.contains(Constant.RESTRICTION_OVER_2G)) {
+			return Constant.RESTRICTION_OVER_2G;
+		}
+
+		LOG.warn("Unrecognised overload restriction reading '%s'".formatted(input));
+		return null;
+	}
+
+	/**
+	 * Indicates whether an outlet power on/off delay reading means the delay is disabled.
+	 *
+	 * <p>The two representations are not interchangeable on the wire: the device displays the disabled state as
+	 * {@link Constant#NEVER} but rejects that word as an argument, taking {@link Constant#NEVER_DELAY} instead. Either
+	 * spelling can come back on a read depending on generation, so both are recognised as the same state.
+	 *
+	 * @param reading the reported delay
+	 * @return {@code true} when the reading denotes a disabled delay
+	 */
+	public static boolean isDelayDisabled(String reading) {
+		if (StringUtils.isNullOrEmpty(reading, true)) {
+			return false;
+		}
+		return Constant.NEVER_PATTERN.matcher(reading).find() || Constant.NEVER_DELAY_PATTERN.matcher(reading).find();
 	}
 
 	public static String mapToStatusValue(String input) {

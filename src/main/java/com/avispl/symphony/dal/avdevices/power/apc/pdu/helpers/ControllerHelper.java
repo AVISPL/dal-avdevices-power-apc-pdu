@@ -15,6 +15,7 @@ import com.avispl.symphony.dal.avdevices.power.apc.pdu.common.Util;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.models.Pdu;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.models.outlets.Outlets;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.types.Command;
+import com.avispl.symphony.dal.avdevices.power.apc.pdu.types.OverloadRestriction;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.types.PduGeneration;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.types.properties.Configuration;
 import com.avispl.symphony.dal.avdevices.power.apc.pdu.types.properties.Outlet;
@@ -37,14 +38,22 @@ public final class ControllerHelper {
 	private static final String OVERLOAD_ALARM = "OverloadAlarm";
 	private static final String OVERLOAD_RESTRICTION = "OverloadRestriction";
 
+	/** Accepted range, in seconds, for an outlet's power on/off delay. */
+	private static final int DELAY_MIN_SECONDS = 0;
+	private static final int DELAY_MAX_SECONDS = 7200;
+	/** Accepted range, in seconds, for an outlet's reboot duration. */
+	private static final int REBOOT_DURATION_MIN_SECONDS = 5;
+	private static final int REBOOT_DURATION_MAX_SECONDS = 60;
+
 	/**
 	 * Generates a list of controllable configuration properties for the given {@link Pdu}.
 	 *
 	 * @param is3Phases indicates whether the PDU has a 3-phase input
+	 * @param generation the firmware generation, which decides the shape of the overload restriction control
 	 * @param pdu the source of configuration data (must not be {@code null})
 	 * @return a list of {@link AdvancedControllableProperty} representing configurable controls; never {@code null}
 	 */
-	public static List<AdvancedControllableProperty> generateConfigurationControllers(boolean is3Phases, Pdu pdu) {
+	public static List<AdvancedControllableProperty> generateConfigurationControllers(boolean is3Phases, PduGeneration generation, Pdu pdu) {
 		var controllableProperties = new ArrayList<>(List.of(
 				ControllablePropertyFactory.createSwitch(Configuration.COLD_START_DELAY.getDisplayName(), pdu.isColdStartDelayDisabled() ? 0 : 1)
 		));
@@ -66,16 +75,16 @@ public final class ControllerHelper {
 					ControllablePropertyFactory.createNumeric(Configuration.PHASE_1_OVERLOAD_ALARM.getDisplayName(), pdu.getOverloadAlarms().get(1)),
 					ControllablePropertyFactory.createNumeric(Configuration.PHASE_2_OVERLOAD_ALARM.getDisplayName(), pdu.getOverloadAlarms().get(2)),
 					ControllablePropertyFactory.createNumeric(Configuration.PHASE_3_OVERLOAD_ALARM.getDisplayName(), pdu.getOverloadAlarms().get(3)),
-					ControllablePropertyFactory.createSwitch(Configuration.PHASE_1_OVERLOAD_RESTRICTION.getDisplayName(), mapToSwitchValue(pdu.getOverloadRestrictions().get(1))),
-					ControllablePropertyFactory.createSwitch(Configuration.PHASE_2_OVERLOAD_RESTRICTION.getDisplayName(), mapToSwitchValue(pdu.getOverloadRestrictions().get(2))),
-					ControllablePropertyFactory.createSwitch(Configuration.PHASE_3_OVERLOAD_RESTRICTION.getDisplayName(), mapToSwitchValue(pdu.getOverloadRestrictions().get(3)))
+					createRestrictionControl(Configuration.PHASE_1_OVERLOAD_RESTRICTION, generation, pdu.getOverloadRestrictions().get(1)),
+					createRestrictionControl(Configuration.PHASE_2_OVERLOAD_RESTRICTION, generation, pdu.getOverloadRestrictions().get(2)),
+					createRestrictionControl(Configuration.PHASE_3_OVERLOAD_RESTRICTION, generation, pdu.getOverloadRestrictions().get(3))
 			));
 		} else {
 			controllableProperties.addAll(List.of(
 					ControllablePropertyFactory.createNumeric(Configuration.LOW_LOAD_WARNING.getDisplayName(), pdu.getLowLoadWarning()),
 					ControllablePropertyFactory.createNumeric(Configuration.NEAR_OVERLOAD_WARNING.getDisplayName(), pdu.getNearOverloadWarning()),
 					ControllablePropertyFactory.createNumeric(Configuration.OVERLOAD_ALARM.getDisplayName(), pdu.getOverloadAlarm()),
-					ControllablePropertyFactory.createSwitch(Configuration.OVERLOAD_RESTRICTION.getDisplayName(), mapToSwitchValue(pdu.getOverloadRestriction()))
+					createRestrictionControl(Configuration.OVERLOAD_RESTRICTION, generation, pdu.getOverloadRestriction())
 			));
 		}
 
@@ -120,6 +129,30 @@ public final class ControllerHelper {
 	}
 
 	/**
+	 * Builds the overload restriction control, whose shape depends on how many states the generation exposes.
+	 *
+	 * <p>2nd generation firmware has three states, so it gets a dropdown carrying the device's own tokens. 1st generation
+	 * is modelled as the on/off pair it reports and keeps its switch.
+	 *
+	 * @param property the restriction property to build a control for
+	 * @param generation the firmware generation
+	 * @param state the current restriction state
+	 * @return a dropdown on 2nd generation, a switch otherwise
+	 */
+	private static AdvancedControllableProperty createRestrictionControl(Configuration property, PduGeneration generation, String state) {
+		if (!generation.is2G()) {
+			return ControllablePropertyFactory.createSwitch(property.getDisplayName(), mapToSwitchValue(state));
+		}
+		// The factory labels a dropdown with its own values; the operator-facing labels differ from the wire tokens here.
+		var control = ControllablePropertyFactory.createDropdown(property.getDisplayName(), OverloadRestriction.STATES, state);
+		if (control.getType() instanceof AdvancedControllableProperty.DropDown dropdown) {
+			dropdown.setLabels(OverloadRestriction.LABELS.toArray(String[]::new));
+		}
+
+		return control;
+	}
+
+	/**
 	 * Generates a list of controllable outlets properties for the given {@link Outlets}.
 	 *
 	 * @param outlets the source of outlet data (must not be {@code null})
@@ -155,12 +188,14 @@ public final class ControllerHelper {
 	 * @param value the value associated with the property
 	 * @return the generated request command
 	 * @throws InvalidArgumentException if the outlet property is unsupported
+	 * @throws IllegalArgumentException if a numeric value falls outside the range the device accepts
 	 */
 	public static String generateOutletRequest(String property, Object value, PduGeneration generation) {
 		var propertyComponent = property.split(Constant.HASH);
 		var nameComponent = propertyComponent[0].split(Constant.UNDERSCORE);
 		var outletNumber = Integer.parseInt(nameComponent[nameComponent.length - 1]);
 		var outletProperty = Outlet.fromProperty(propertyComponent[1]);
+		validateOutletRange(property, outletProperty, String.valueOf(value));
 		var param = buildOutletParam(outletNumber, outletProperty, value.toString(), generation);
 
 		return switch (outletProperty) {
@@ -213,21 +248,21 @@ public final class ControllerHelper {
 	 * @param phase the phase the control targets
 	 * @param value the requested value
 	 * @param pdu the currently known thresholds to compare against
-	 * @throws InvalidArgumentException if the requested value would break the required ordering
+	 * @throws IllegalArgumentException if the requested value would break the required ordering
 	 */
 	private static void validateThresholdOrder(String configProperty, Integer phase, String value, Pdu pdu) {
 		// The restriction control carries a switch state rather than an amperage, so it has no ordering to satisfy.
 		if (configProperty.contains(OVERLOAD_RESTRICTION)) {
 			return;
 		}
-		var requested = toThreshold(value);
+		var requested = toNumber(value);
 		if (requested == null) {
 			return;
 		}
 		var is3Phases = configProperty.startsWith(PHASE);
-		var lowLoad = toThreshold(is3Phases ? pdu.getLowLoadWarnings().get(phase) : pdu.getLowLoadWarning());
-		var nearOverload = toThreshold(is3Phases ? pdu.getNearOverloadWarnings().get(phase) : pdu.getNearOverloadWarning());
-		var overloadAlarm = toThreshold(is3Phases ? pdu.getOverloadAlarms().get(phase) : pdu.getOverloadAlarm());
+		var lowLoad = toNumber(is3Phases ? pdu.getLowLoadWarnings().get(phase) : pdu.getLowLoadWarning());
+		var nearOverload = toNumber(is3Phases ? pdu.getNearOverloadWarnings().get(phase) : pdu.getNearOverloadWarning());
+		var overloadAlarm = toNumber(is3Phases ? pdu.getOverloadAlarms().get(phase) : pdu.getOverloadAlarm());
 
 		if (configProperty.contains(LOW_LOAD_WARNING) && nearOverload != null && requested >= nearOverload) {
 			throw thresholdViolation("Low Load Warning", phase, "must be less than Near Overload Warning");
@@ -242,25 +277,62 @@ public final class ControllerHelper {
 		}
 	}
 
+	/**
+	 * Enforces the ranges the device accepts for the numeric outlet controls, so an out-of-range value fails here rather
+	 * than being rejected after a round trip.
+	 *
+	 * <p>Only the {@code (sec)} controls carry a range. The bare {@code PowerOffDelay} and {@code PowerOnDelay}
+	 * properties are switches that resolve to {@code min} or {@code never}, and the remaining outlet controls are
+	 * switches or a button.
+	 *
+	 * <p>A value that is not numeric is left to the device, matching how {@link #validateThresholdOrder} treats a value
+	 * it cannot compare.
+	 *
+	 * @param property the full property identifier, used in the error message
+	 * @param outletProperty the resolved outlet property
+	 * @param value the requested value
+	 * @throws IllegalArgumentException if the value falls outside the accepted range
+	 */
+	private static void validateOutletRange(String property, Outlet outletProperty, String value) {
+		switch (outletProperty) {
+			case POWER_OFF_DELAY_SEC, POWER_ON_DELAY_SEC -> requireInRange(property, value, DELAY_MIN_SECONDS, DELAY_MAX_SECONDS);
+			case REBOOT_DURATION_SEC -> requireInRange(property, value, REBOOT_DURATION_MIN_SECONDS, REBOOT_DURATION_MAX_SECONDS);
+			default -> {
+				// Nothing to bound; the remaining outlet controls do not carry a numeric value.
+			}
+		}
+	}
+
+	private static void requireInRange(String property, String value, int min, int max) {
+		var requested = toNumber(value);
+		if (requested == null) {
+			return;
+		}
+		if (requested < min || requested > max) {
+			throw new IllegalArgumentException(
+					"%s must be between %d and %d, set failed.".formatted(property, min, max));
+		}
+	}
+
 	/** Builds a violation error worded the way the device words its own rejection. */
-	private static InvalidArgumentException thresholdViolation(String label, Integer phase, String rule) {
-		return new InvalidArgumentException("%s Phase %d %s, set failed.".formatted(label, phase, rule));
+	private static IllegalArgumentException thresholdViolation(String label, Integer phase, String rule) {
+		return new IllegalArgumentException("%s Phase %d %s, set failed.".formatted(label, phase, rule));
 	}
 
 	/**
-	 * Parses a threshold reading into a comparable number.
+	 * Parses a reading or a requested value into a comparable number.
 	 *
-	 * @param value the reading, which may be {@code null} or a placeholder such as {@link Constant#NOT_AVAILABLE}
+	 * @param value the value, which may be {@code null} or a placeholder such as {@link Constant#NOT_AVAILABLE}
 	 * @return the parsed value, or {@code null} when it cannot be compared
 	 */
-	private static Double toThreshold(String value) {
+	private static Double toNumber(String value) {
 		if (StringUtils.isNullOrEmpty(value, true)) {
 			return null;
 		}
 		try {
 			return Double.valueOf(value.trim());
 		} catch (NumberFormatException e) {
-			LOG.warn("Skip threshold comparison; '%s' is not numeric".formatted(value));
+			LOG.warn("Skip numeric comparison; '%s' is not numeric".formatted(value));
 			return null;
 		}
 	}
@@ -276,13 +348,29 @@ public final class ControllerHelper {
 	 */
 	private static String buildParam(Integer phase, String property, String value, PduGeneration generation) {
 		var paramValue = value;
-		if (property.contains("OverloadRestriction")) {
-			// `rpdu` takes on/off; `rpdu2g` takes none/near/over, where the switch maps onto none and over.
-			paramValue = generation.is2G()
-					? ("1".equals(value) ? Constant.RESTRICTION_OVER_2G : Constant.RESTRICTION_NONE_2G)
-					: Util.mapToStatusValue(value);
+		if (property.contains(OVERLOAD_RESTRICTION)) {
+			// `rpdu2g` exposes all three states through a dropdown, so its selection is already the token to send.
+			// `rpdu` is modelled as a switch and takes on/off.
+			paramValue = generation.is2G() ? requireRestrictionState(property, value) : Util.mapToStatusValue(value);
 		}
 		return phase == null ? paramValue : phase + Constant.SPACE + paramValue;
+	}
+
+	/**
+	 * Checks a dropdown selection against the states {@code phRestrictn} accepts.
+	 *
+	 * @param property the property being controlled, used in the error message
+	 * @param value the selected state
+	 * @return the state, unchanged
+	 * @throws IllegalArgumentException if the selection is not one of {@link OverloadRestriction#STATES}
+	 */
+	private static String requireRestrictionState(String property, String value) {
+		var state = value == null ? null : value.trim().toLowerCase();
+		if (!OverloadRestriction.STATES.contains(state)) {
+			throw new IllegalArgumentException(
+					"%s must be one of %s, set failed.".formatted(property, OverloadRestriction.STATES));
+		}
+		return state;
 	}
 
 	/**
@@ -299,7 +387,10 @@ public final class ControllerHelper {
 			// `rebootduration` separates outlet from duration with a colon; `olRbootTime` uses a space.
 			paramBuilder.append(generation.is2G() ? Constant.SPACE : Constant.COLON).append(value);
 		} else if (Outlet.POWER_OFF_DELAY.equals(property) || Outlet.POWER_ON_DELAY.equals(property)) {
-			paramBuilder.append(Constant.SPACE).append("1".equals(value) ? Constant.MIN_VALUE : Constant.NEVER);
+			// `olOffDelay`/`olOnDelay` reject the word the device reports the disabled state as, and take -1 instead.
+			// `poweroffdelay`/`powerondelay` keep the word; the 1st generation dialect could not be verified against hardware.
+			var disabled = generation.is2G() ? Constant.NEVER_DELAY : Constant.NEVER;
+			paramBuilder.append(Constant.SPACE).append("1".equals(value) ? Constant.MIN_VALUE : disabled);
 		} else {
 			paramBuilder.append(Constant.SPACE).append(value);
 		}

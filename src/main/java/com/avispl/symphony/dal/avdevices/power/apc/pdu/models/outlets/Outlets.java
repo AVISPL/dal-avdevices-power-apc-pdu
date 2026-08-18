@@ -110,9 +110,10 @@ public class Outlets {
 				continue;
 			}
 			var outletDetail = this.outletDetails.computeIfAbsent(comp[0], key -> new OutletDetail());
-			var value = Util.extractValue(comp[2]).orElse(null);
-			outletDetail.setPowerOffDelay(value);
-			outletDetail.setPowerOffDelayDisabled(Constant.NEVER.equals(value));
+			// Normalize the -1 sentinel onto the word, so the stored value is the same whichever spelling was reported.
+			var disabled = Util.isDelayDisabled(comp[2]);
+			outletDetail.setPowerOffDelay(disabled ? Constant.NEVER : Util.extractValue(comp[2]).orElse(null));
+			outletDetail.setPowerOffDelayDisabled(disabled);
 		}
 	}
 
@@ -124,9 +125,9 @@ public class Outlets {
 				continue;
 			}
 			var outletDetail = this.outletDetails.computeIfAbsent(comp[0], key -> new OutletDetail());
-			var value = Util.extractValue(comp[2]).orElse(null);
-			outletDetail.setPowerOnDelay(value);
-			outletDetail.setPowerOnDelayDisabled(Constant.NEVER.equals(value));
+			var disabled = Util.isDelayDisabled(comp[2]);
+			outletDetail.setPowerOnDelay(disabled ? Constant.NEVER : Util.extractValue(comp[2]).orElse(null));
+			outletDetail.setPowerOnDelayDisabled(disabled);
 		}
 	}
 

@@ -74,7 +74,23 @@ public class Pdu {
 	}
 
 	public void setCurrent(ResponsePdu current) {
-		this.current = Optional.ofNullable(current).map(ResponsePdu::getValue).orElse(null);
+		this.current = toExactReading(current);
+	}
+
+	/**
+	 * Reads a measurement exactly as the device reported it, unit stripped.
+	 *
+	 * <p>Re-extracts from the unparsed response for the same reason {@link #toThreshold} does: {@link ResponsePdu#getValue()}
+	 * has already been rounded, so {@code 0.4 A} would arrive here as {@code 0}.
+	 *
+	 * @param response the measurement response; may be {@code null}
+	 * @return the number as reported, or {@code null} when it cannot be read
+	 */
+	private static String toExactReading(ResponsePdu response) {
+		return Optional.ofNullable(response)
+				.map(ResponsePdu::getRaw)
+				.flatMap(Util::extractExactValue)
+				.orElse(null);
 	}
 
 	public void setLowLoadWarning(ResponsePdu lowLoadWarning) {
@@ -124,7 +140,8 @@ public class Pdu {
 		var phaseCurrents = threePhasesCurrent.getValue().split("\n");
 		for (String phaseCurrent : phaseCurrents) {
 			String[] comp = phaseCurrent.split(Constant.COLON);
-			this.currents.put(Integer.parseInt(comp[0].trim()), comp[1].trim());
+			// Store the bare number, matching the 2nd generation path; the reading arrives here carrying its unit.
+			this.currents.put(Integer.parseInt(comp[0].trim()), Util.extractExactValue(comp[1]).orElse(null));
 		}
 	}
 
@@ -179,7 +196,7 @@ public class Pdu {
 	}
 
 	public void setPhaseCurrents(RawResponse currents) {
-		distributePhaseValues(currents, this.currents, value -> Util.extractValue(value).orElse(null));
+		distributePhaseValues(currents, this.currents, value -> Util.extractExactValue(value).orElse(null));
 	}
 
 	public void setPhaseLowLoadWarnings(RawResponse lowLoadWarnings) {
@@ -195,7 +212,7 @@ public class Pdu {
 	}
 
 	public void setPhaseOverloadRestrictions(RawResponse overloadRestrictions) {
-		distributePhaseValues(overloadRestrictions, this.overloadRestrictions, Util::toRestrictionState);
+		distributePhaseValues(overloadRestrictions, this.overloadRestrictions, Util::toRestrictionState2G);
 	}
 
 	@Getter
